@@ -36,7 +36,7 @@ LXST uses encryption provided by [Reticulum](https://reticulum.network), and thu
 
 ## Project Status & License
 
-This software is in a very early alpha state, and will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at the `rnphone` example, but everything else will currently be a voyage of your own making.
+This software is in a very early alpha state, and will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
 
 While under early development, the project is kept under a `CC BY-NC-ND 4.0` license.
 
