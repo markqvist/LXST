@@ -10,8 +10,14 @@ packages.append("LXST.Utilities")
 packages.append("LXST.Primitives.hardware")
 packages.append("LXST.Codecs.libs.pydub")
 packages.append("LXST.Codecs.libs.pyogg")
-print("Packages:")
-print(packages)
+
+package_data = {
+"": [
+    "Codecs/libs/pyogg/libs/win_amd64/*",
+    "Codecs/libs/pyogg/libs/macos/*",
+    "Sounds/*",
+    ]
+}
 
 setuptools.setup(
     name="lxst",
@@ -23,6 +29,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://git.unsigned.io/markqvist/lxst",
     packages=packages,
+    package_data=package_data,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: Other/Proprietary License",

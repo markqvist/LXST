@@ -98,6 +98,16 @@ class ReticulumTelephone():
 
         if not os.path.isdir(self.storagedir):
             os.makedirs(self.storagedir)
+            ringer_tones = ["ringer.opus", "soft.opus"]
+            sounds_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Sounds"))
+            if os.path.isdir(sounds_path):
+                import shutil
+                for filename in ringer_tones:
+                    src_path = os.path.join(sounds_path, filename)
+                    dst_path = os.path.join(self.configdir, filename)
+                    if os.path.isfile(src_path):
+                        RNS.log(f"Copying {src_path} to {dst_path}")
+                        shutil.copy(src_path, dst_path)
 
         if not os.path.isfile(self.configpath):
             self.create_default_config()
@@ -691,7 +701,7 @@ __default_rnphone_config__ = """# This is an example rnphone config file.
     # phone is ringing. Must be in OPUS format, and
     # located in the rnphone config directory.
     
-    ringtone = ringtone.opus
+    ringtone = ringer.opus
 
     # You can define the preferred audio devices
     # to use as the speaker output, ringer output

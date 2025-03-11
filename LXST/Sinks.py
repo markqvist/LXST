@@ -23,9 +23,61 @@ class LinuxBackend():
     def get_player(self, samples_per_frame=None):
         return self.device.player(samplerate=self.samplerate, blocksize=samples_per_frame)
 
+    def release_player(self): pass
+
+class DarwinBackend():
+    SAMPLERATE = 48000
+
+    def __init__(self, preferred_device=None, samplerate=SAMPLERATE):
+        import soundcard
+        self.samplerate = samplerate
+        self.soundcard  = soundcard
+        if preferred_device:
+            try:    self.device = self.soundcard.get_speaker(preferred_device)
+            except: self.device = soundcard.default_speaker()
+        else:       self.device = soundcard.default_speaker()
+        RNS.log(f"Using output device {self.device}", RNS.LOG_DEBUG)
+
+    def flush(self):
+        self.recorder.flush()
+
+    def get_player(self, samples_per_frame=None):
+        return self.device.player(samplerate=self.samplerate, blocksize=samples_per_frame)
+
+    def release_player(self): pass
+
+class WindowsBackend():
+    SAMPLERATE = 48000
+
+    def __init__(self, preferred_device=None, samplerate=SAMPLERATE):
+        import soundcard
+        from pythoncom import CoInitializeEx, CoUninitialize
+        self.com_init = CoInitializeEx
+        self.com_release = CoUninitialize
+        self.samplerate = samplerate
+        self.soundcard  = soundcard
+        if preferred_device:
+            try:    self.device = self.soundcard.get_speaker(preferred_device)
+            except: self.device = soundcard.default_speaker()
+        else:       self.device = soundcard.default_speaker()
+        RNS.log(f"Using output device {self.device}", RNS.LOG_DEBUG)
+
+    def flush(self):
+        self.recorder.flush()
+
+    def get_player(self, samples_per_frame=None):
+        self.com_init(0)
+        return self.device.player(samplerate=self.samplerate, blocksize=samples_per_frame)
+
+    def release_player(self): self.com_release()
+
 def get_backend():
     if RNS.vendor.platformutils.is_linux():
         return LinuxBackend
+    elif RNS.vendor.platformutils.is_windows():
+        return WindowsBackend
+    elif RNS.vendor.platformutils.is_darwin():
+        return DarwinBackend
     else:
         return None
 
@@ -131,6 +183,8 @@ class LineSink(LocalSink):
                                 self.should_run = False
                             else:
                                 time.sleep(self.frame_time*0.1)
+
+            self.backend.release_player()
 
 class PacketSink(RemoteSink):
     pass
