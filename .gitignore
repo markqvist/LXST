@@ -1,0 +1,10 @@
+*.DS_Store
+*.pyc
+testutils
+build
+dist
+docs/build
+lxst*.egg-info
+examples/LXST
+LXST/Utilities/LXST
+RNS

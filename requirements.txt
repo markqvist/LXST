@@ -1,0 +1,3 @@
+soundcard
+numpy
+pycodec2
