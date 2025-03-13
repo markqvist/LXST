@@ -214,7 +214,10 @@ class LineSource(LocalSource):
     def __ingest_job(self):
         with self.recording_lock:
             frame_samples = None
-            with self.backend.get_recorder(samples_per_frame=self.samples_per_frame) as recorder:
+            if not RNS.vendor.platformutils.is_darwin(): backend_samples_per_frame = self.samples_per_frame
+            else: backend_samples_per_frame = None
+
+            with self.backend.get_recorder(samples_per_frame=backend_samples_per_frame) as recorder:
                 while self.should_run:
                     frame_samples = recorder.record(numframes=self.samples_per_frame)
                     if self.codec:

@@ -156,7 +156,10 @@ class LineSink(LocalSink):
 
     def __digest_job(self):
         with self.digest_lock:
-            with self.backend.get_player(samples_per_frame=self.samples_per_frame) as player:
+            if not RNS.vendor.platformutils.is_darwin(): backend_samples_per_frame = self.samples_per_frame
+            else: backend_samples_per_frame = None
+
+            with self.backend.get_player(samples_per_frame=backend_samples_per_frame) as player:
                 while self.should_run:
                     frames_ready = len(self.frame_deque)
                     if frames_ready:

@@ -789,9 +789,14 @@ WantedBy=graphical.target
 """
 
 class Terminal():
-    UNDERLINE = "\033[4m"
-    BOLD = "\033[1m"
-    END = "\033[0m"
+    if not RNS.vendor.platformutils.is_windows():
+        UNDERLINE = "\033[4m"
+        BOLD = "\033[1m"
+        END = "\033[0m"
+    else:
+        UNDERLINE = ""
+        BOLD = ""
+        END = ""
 
 if __name__ == "__main__":
     main()

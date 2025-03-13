@@ -167,7 +167,7 @@ def get_encoder_name():
         return "ffmpeg"
     else:
         # should raise exception
-        warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+        # warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
         return "ffmpeg"
 
 
