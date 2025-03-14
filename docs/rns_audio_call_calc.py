@@ -4,7 +4,7 @@ import RNS
 import RNS.vendor.umsgpack as mp
 
 def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
-             signalling_bytes=14, method="msgpack"):
+             signalling_bytes=14, token_overhead=48, method="msgpack"):
     # Simulated on-air link speed
     LINK_SPEED = link_speed
 
@@ -51,13 +51,14 @@ def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
         exit(1)
 
     # Calculate required encrypted token blocks
+    TOKEN_OVERHEAD = token_overhead
     BLOCKSIZE = 16
     REQUIRED_BLOCKS = math.ceil((PL_LEN+1)/BLOCKSIZE)
     ENCRYPTED_PAYLOAD_LEN = REQUIRED_BLOCKS*BLOCKSIZE
     BLOCK_HEADROOM = (REQUIRED_BLOCKS*BLOCKSIZE) - PL_LEN - 1
 
     # The complete on-air packet length
-    PACKET_LEN     = PHY_OVERHEAD+RNS_OVERHEAD+ENCRYPTED_PAYLOAD_LEN
+    PACKET_LEN     = PHY_OVERHEAD+RNS_OVERHEAD+ENCRYPTED_PAYLOAD_LEN+TOKEN_OVERHEAD
     PACKET_LATENCY = round(PACKET_LEN*PER_BYTE_LATENCY_MS, 1)
 
     # TODO: This should include any additional
@@ -71,6 +72,7 @@ def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
 
     # Calculate latencies
     TRANSPORT_LATENCY  = round((PHY_OVERHEAD+RNS_OVERHEAD)*PER_BYTE_LATENCY_MS, 1)
+    TOKEN_LATENCY      = round((TOKEN_OVERHEAD)*PER_BYTE_LATENCY_MS, 1)
 
     PAYLOAD_LATENCY    = round(ENCRYPTED_PAYLOAD_LEN*PER_BYTE_LATENCY_MS, 1)
     RAW_DATA_LATENCY   = round(AUDIO_LEN*PER_BYTE_LATENCY_MS, 1)
@@ -94,6 +96,7 @@ def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
     print(f"  Payload length       : {PL_LEN} bytes")
     print(f"  AES blocks needed    : {REQUIRED_BLOCKS}")
     print(f"  Encrypted payload    : {ENCRYPTED_PAYLOAD_LEN} bytes")
+    print(f"  Token overhead       : {TOKEN_OVERHEAD} bytes")
     print(f"  Transport overhead   : {TRANSPORT_OVERHEAD} bytes ({RNS_OVERHEAD} from RNS, {PHY_OVERHEAD} from PHY)")
     print(f"  On-air length        : {PACKET_LEN} bytes")
     print(f"  Packet airtime       : {round(PACKET_AIRTIME,2)}ms")
@@ -107,6 +110,7 @@ def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
     print(f"        Audio data     : contributes {RAW_DATA_LATENCY}ms")
     print(f"        Packing format : contributes {PACKING_LATENCY}ms")
     print(f"        Encryption     : contributes {ENCRYPTION_LATENCY}ms {E_OPT_STR}")
+    print(f"      Token overhead   : contributes {TOKEN_LATENCY}ms")
     print(f"      RNS+PHY overhead : contributes {TRANSPORT_LATENCY}ms")
     print(f"")
     print(f"  Half-duplex airtime  : {round(AIRTIME_PCT, 2)}% of link capacity")
@@ -133,8 +137,8 @@ def simulate(link_speed=2735, audio_slot_ms=400, codec_rate=1200,
 #simulate(link_speed=60e3, audio_slot_ms=270, codec_rate=12000,
 #         signalling_bytes=18, method="msgpack")
 
-simulate(link_speed=9600, audio_slot_ms=300, codec_rate=3200,
-         signalling_bytes=2, method="msgpack")
+simulate(link_speed=10e3, audio_slot_ms=353, codec_rate=6000,
+         signalling_bytes=0, token_overhead=16+32*1, method="msgpack")
 
 #print("\n\n= With protobuf ===============")
 #simulate(method="protobuf")

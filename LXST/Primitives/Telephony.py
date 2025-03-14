@@ -86,8 +86,8 @@ class Telephone(SignallingReceiver):
         RNS.Transport.deregister_destination(self.destination)
         self.destination = None
 
-    def announce(self):
-        self.destination.announce()
+    def announce(self, attached_interface=None):
+        self.destination.announce(attached_interface=attached_interface)
         self.last_announce = time.time()
 
     def set_allowed(self, allowed):
