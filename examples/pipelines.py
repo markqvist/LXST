@@ -2,7 +2,6 @@ import RNS
 import LXST
 import sys
 import time
-RNS.loglevel = RNS.LOG_DEBUG
 
 if len(sys.argv) < 2:
     print("No codec specified")

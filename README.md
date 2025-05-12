@@ -47,3 +47,17 @@ If you want to try out LXST, you can install it with pip:
 ```bash
 pip install lxst
 ```
+
+On Raspberry Pi, install various dependencies with:
+
+```bash
+# Audio codecs
+sudo apt install python3-pip python3-pyaudio python3-dev python3-cryptography build-essential libopusfile0 libsdl2-dev libavcodec-dev libavdevice-dev libavfilter-dev portaudio19-dev codec2 libcodec2-1.0 xclip xsel
+wget https://raw.githubusercontent.com/markqvist/Sideband/main/docs/utilities/pycodec2-3.0.1-cp311-cp311-linux_aarch64.whl
+pip install ./pycodec2-3.0.1-cp311-cp311-linux_aarch64.whl --break-system-packages
+
+# For hardware control over I2C:
+pip install smbus2 --break-system-packages # Install smbus module if not already installed
+sudo raspi-config # Enable the I2C bus under "Interface Options"
+sudo apt install python3-rpi.gpio # Install gpio module system-wide
+```

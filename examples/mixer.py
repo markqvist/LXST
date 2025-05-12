@@ -2,7 +2,6 @@ import RNS
 import LXST
 import sys
 import time
-RNS.loglevel = RNS.LOG_DEBUG
 
 target_frame_ms  = 20
 pipelined_output = True

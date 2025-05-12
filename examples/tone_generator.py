@@ -2,7 +2,6 @@ import RNS
 import LXST
 import sys
 import time
-RNS.loglevel = RNS.LOG_DEBUG
 
 target_frame_ms = 40
 tone            = LXST.Generators.ToneSource(frequency=388, ease_time_ms=3.14159, target_frame_ms=target_frame_ms)

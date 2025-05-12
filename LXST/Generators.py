@@ -8,8 +8,6 @@ from collections import deque
 from .Codecs import Codec, CodecError
 from .Sources import LocalSource
 
-RNS.loglevel = RNS.LOG_DEBUG
-
 class ToneSource(LocalSource):
     DEFAULT_FRAME_MS   = 80
     DEFAULT_SAMPLERATE = 48000

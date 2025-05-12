@@ -9,8 +9,6 @@ from .Sinks import LocalSink
 from .Codecs import Codec, CodecError
 from .Codecs.libs.pyogg import OpusFile
 
-RNS.loglevel = RNS.LOG_DEBUG
-
 class LinuxBackend():
     SAMPLERATE = 48000
 

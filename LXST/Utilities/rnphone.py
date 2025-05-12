@@ -659,7 +659,7 @@ def main():
         parser.add_argument("--rnsconfig", action="store", default=None, help="path to alternative Reticulum config directory", type=str)
         parser.add_argument("-s", "--service", action="store_true", help="run as a service", default=False)
         parser.add_argument("--systemd", action="store_true", help="display example systemd unit", default=False)
-        parser.add_argument("--version", action="version", version="rnprobe {version}".format(version=__version__))
+        parser.add_argument("--version", action="version", version="rnphone {version}".format(version=__version__))
         parser.add_argument('-v', '--verbose', action='count', default=0)
 
         args = parser.parse_args()
