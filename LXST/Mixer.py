@@ -44,18 +44,20 @@ class Mixer(LocalSource, LocalSink):
     def stop(self):
         self.should_run = False
 
+    def set_source_max_frames(self, source, max_frames):
+        with self.insert_lock:
+            if not source in self.incoming_frames: self.incoming_frames[source] = deque(maxlen=max_frames)
+            else:                                  self.incoming_frames[source] = deque(self.incoming_frames[source], maxlen=max_frames)
+
     def can_receive(self, from_source):
-        if not from_source in self.incoming_frames:
-            return True
-        elif len(self.incoming_frames[from_source]) < self.MAX_FRAMES:
-            return True
-        else:
-            return False
+        if not from_source in self.incoming_frames:                    return True
+        elif len(self.incoming_frames[from_source]) < self.MAX_FRAMES: return True
+        else:                                                          return False
 
     def handle_frame(self, frame, source, decoded=False):
         with self.insert_lock:
             if not source in self.incoming_frames:
-                self.incoming_frames[source]  = deque(maxlen=self.MAX_FRAMES)
+                self.incoming_frames[source] = deque(maxlen=self.MAX_FRAMES)
                 
                 if not self.channels:
                     self.channels = source.channels

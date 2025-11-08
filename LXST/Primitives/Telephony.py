@@ -77,6 +77,7 @@ class Telephone(SignallingReceiver):
         self.speaker_device = None
         self.microphone_device = None
         self.ringer_device = None
+        self.low_latency_output = False
 
         threading.Thread(target=self.__jobs, daemon=True).start()
         RNS.log(f"{self} listening on {RNS.prettyhexrep(self.destination.hash)}", RNS.LOG_DEBUG)
@@ -133,6 +134,14 @@ class Telephone(SignallingReceiver):
         self.ringtone_path = ringtone_path
         self.ringtone_gain = gain
         RNS.log(f"{self} ringtone set to {self.ringtone_path}", RNS.LOG_DEBUG)
+
+    def set_low_latency_output(self, enabled):
+        if enabled:
+            self.low_latency_output = True
+            RNS.log(f"{self} low-latency output enabled", RNS.LOG_DEBUG)
+        else:
+            self.low_latency_output = False
+            RNS.log(f"{self} low-latency output disabled", RNS.LOG_DEBUG)
 
     def __jobs(self):
         while self.destination != None:
@@ -251,6 +260,7 @@ class Telephone(SignallingReceiver):
                 self.__start_pipelines()
                 RNS.log(f"Call setup complete for {RNS.prettyhexrep(identity.hash)}", RNS.LOG_DEBUG)
                 if callable(self.__established_callback): self.__established_callback(self.active_call.get_remote_identity())
+                if self.low_latency_output: self.audio_output.enable_low_latency()
                 return True
 
     def hangup(self):
@@ -393,12 +403,12 @@ class Telephone(SignallingReceiver):
                     self.__prepare_dialling_pipelines()
                     self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms)
                     self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer)
-                    # self.audio_input = OpusFileSource("/home/markqvist/Information/Source/LXST/docs/425.opus", loop=True, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer, timed=True)
                     self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
                                                       codec=self.transmit_codec,
                                                       sink=Packetizer(self.active_call, failure_callback=self.__packetizer_failure))
                     
                     self.active_call.audio_source = LinkSource(link=self.active_call, signalling_receiver=self, sink=self.receive_mixer)
+                    self.receive_mixer.set_source_max_frames(self.active_call.audio_source, 2)
                     
                     self.signal(Signalling.STATUS_ESTABLISHED, self.active_call)
 
@@ -496,6 +506,7 @@ class Telephone(SignallingReceiver):
                         RNS.log(f"Call setup complete for {RNS.prettyhexrep(self.active_call.get_remote_identity().hash)}", RNS.LOG_DEBUG)
                         self.call_status = signal
                         if callable(self.__established_callback): self.__established_callback(self.active_call.get_remote_identity())
+                        if self.low_latency_output: self.audio_output.enable_low_latency()
 
     def __str__(self):
         return f"<lxst.telephony/{RNS.hexrep(self.identity.hash, delimit=False)}>"

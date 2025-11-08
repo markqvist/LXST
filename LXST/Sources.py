@@ -24,8 +24,29 @@ class LinuxBackend():
         self.bitdepth   = 32
         RNS.log(f"Using input device {self.device}", RNS.LOG_DEBUG)
 
-    def flush(self):
-        self.recorder.flush()
+    def flush(self): self.recorder.flush()
+
+    def get_recorder(self, samples_per_frame):
+        return self.device.recorder(samplerate=self.SAMPLERATE, blocksize=samples_per_frame)
+
+    def release_recorder(self): pass
+
+class AndroidBackend():
+    SAMPLERATE = 48000
+
+    def __init__(self, preferred_device=None, samplerate=SAMPLERATE):
+        from .Platforms.android import soundcard
+        self.samplerate = samplerate
+        self.soundcard  = soundcard
+        if preferred_device:
+            try:    self.device = self.soundcard.get_microphone(preferred_device)
+            except: self.device = self.soundcard.default_microphone()
+        else:       self.device = self.soundcard.default_microphone()
+        self.channels   = self.device.channels
+        self.bitdepth   = 32
+        RNS.log(f"Using input device {self.device}", RNS.LOG_DEBUG)
+
+    def flush(self): self.recorder.flush()
 
     def get_recorder(self, samples_per_frame):
         return self.device.recorder(samplerate=self.SAMPLERATE, blocksize=samples_per_frame)
@@ -47,8 +68,7 @@ class DarwinBackend():
         self.bitdepth   = 32
         RNS.log(f"Using input device {self.device}", RNS.LOG_DEBUG)
 
-    def flush(self):
-        self.recorder.flush()
+    def flush(self): self.recorder.flush()
 
     def get_recorder(self, samples_per_frame):
         return self.device.recorder(samplerate=self.SAMPLERATE, blocksize=samples_per_frame)
@@ -73,8 +93,7 @@ class WindowsBackend():
         self.bitdepth   = 32
         RNS.log(f"Using input device {self.device}", RNS.LOG_DEBUG)
 
-    def flush(self):
-        self.recorder.flush()
+    def flush(self): self.recorder.flush()
 
     def get_recorder(self, samples_per_frame):
         self.com_init(0)
@@ -83,25 +102,17 @@ class WindowsBackend():
     def release_recorder(self): self.com_release()
 
 def get_backend():
-    if RNS.vendor.platformutils.is_linux():
-        return LinuxBackend
-    elif RNS.vendor.platformutils.is_windows():
-        return WindowsBackend
-    elif RNS.vendor.platformutils.is_darwin():
-        return DarwinBackend
-    else:
-        return None
+    if   RNS.vendor.platformutils.is_linux():   return LinuxBackend
+    elif RNS.vendor.platformutils.is_windows(): return WindowsBackend
+    elif RNS.vendor.platformutils.is_darwin():  return DarwinBackend
+    elif RNS.vendor.platformutils.is_android(): return AndroidBackend
+    else:                                       return None
 
 Backend = get_backend()
 
-class Source():
-    pass
-
-class LocalSource(Source):
-    pass
-
-class RemoteSource(Source):
-    pass
+class Source(): pass
+class LocalSource(Source): pass
+class RemoteSource(Source): pass
 
 class Loopback(LocalSource, LocalSink):
     MAX_FRAMES = 128
@@ -120,14 +131,11 @@ class Loopback(LocalSource, LocalSink):
             RNS.log(f"{self} starting", RNS.LOG_DEBUG)
             self.should_run = True
 
-    def stop(self):
-        self.should_run = False
+    def stop(self): self.should_run = False
 
     def can_receive(self, from_source=None):
-        if self._sink:
-            return self._sink.can_receive(from_source)
-        else:
-            return True
+        if self._sink: return self._sink.can_receive(from_source)
+        else:          return True
 
     def handle_frame(self, frame, source):
         with self.loopback_lock:
@@ -135,12 +143,10 @@ class Loopback(LocalSource, LocalSink):
                 self.sink.handle_frame(self.codec.decode(frame), self)
 
     @property
-    def source(self):
-        return self._source
+    def source(self): return self._source
 
     @source.setter
-    def source(self, source):
-        self._source = source
+    def source(self, source): self._source = source
 
 class LineSource(LocalSource):
     MAX_FRAMES       = 128
@@ -161,22 +167,17 @@ class LineSource(LocalSource):
         self.sink             = sink
 
     @property
-    def codec(self):
-        return self._codec
+    def codec(self): return self._codec
 
     @codec.setter
     def codec(self, codec):
-        if codec == None:
-            self._codec = None
-        elif not issubclass(type(codec), Codec):
-            raise CodecError(f"Invalid codec specified for {self}")
+        if codec == None: self._codec = None
+        elif not issubclass(type(codec), Codec): raise CodecError(f"Invalid codec specified for {self}")
         else:
             self._codec = codec
 
-            if self.codec.preferred_samplerate:
-                self.preferred_samplerate = self.codec.preferred_samplerate
-            else:
-                self.preferred_samplerate = Backend.SAMPLERATE
+            if self.codec.preferred_samplerate: self.preferred_samplerate = self.codec.preferred_samplerate
+            else:                               self.preferred_samplerate = Backend.SAMPLERATE
 
             if self.codec.frame_quanta_ms:
                 if self.target_frame_ms%self.codec.frame_quanta_ms != 0:
@@ -206,8 +207,7 @@ class LineSource(LocalSource):
             self.ingest_thread = threading.Thread(target=self.__ingest_job, daemon=True)
             self.ingest_thread.start()
 
-    def stop(self):
-        self.should_run = False
+    def stop(self): self.should_run = False
 
     def __ingest_job(self):
         with self.recording_lock:
@@ -238,8 +238,7 @@ class OpusFileSource(LocalSource):
         self.next_frame      = None
         self._codec          = None
 
-        if file_path == None:
-            raise TypeError(f"{self} initialised with invalid file path: {file_path}")
+        if file_path == None: raise TypeError(f"{self} initialised with invalid file path: {file_path}")
         elif os.path.isfile(file_path):
             self.file = OpusFile(file_path)
             self.samplerate = self.file.frequency
@@ -250,22 +249,19 @@ class OpusFileSource(LocalSource):
             self.length_ms = (self.sample_count/self.samplerate)*1000
             RNS.log(f"{self} loaded {RNS.prettytime(self.length_ms/1000)} of audio from {file_path}", RNS.LOG_DEBUG)
             RNS.log(f"{self} samplerate is {RNS.prettyfrequency(self.samplerate)}, {self.channels} channels, {self.sample_count} samples in total", RNS.LOG_DEBUG)
-        else:
-            raise OSError(f"{self} file {file_path} not found")
+        
+        else: raise OSError(f"{self} file {file_path} not found")
 
         self.codec           = codec
         self.sink            = sink
 
     @property
-    def codec(self):
-        return self._codec
+    def codec(self): return self._codec
 
     @codec.setter
     def codec(self, codec):
-        if codec == None:
-            self._codec = None
-        elif not issubclass(type(codec), Codec):
-            raise CodecError(f"Invalid codec specified for {self}")
+        if codec == None: self._codec = None
+        elif not issubclass(type(codec), Codec): raise CodecError(f"Invalid codec specified for {self}")
         else:
             self._codec = codec
 
@@ -295,8 +291,7 @@ class OpusFileSource(LocalSource):
             self.ingest_thread = threading.Thread(target=self.__ingest_job, daemon=True)
             self.ingest_thread.start()
 
-    def stop(self):
-        self.should_run = False
+    def stop(self): self.should_run = False
 
     def __ingest_job(self):
         with self.read_lock:
@@ -323,5 +318,4 @@ class OpusFileSource(LocalSource):
                 else:
                     time.sleep(self.frame_time*0.1)
 
-class PacketSource(RemoteSource):
-    pass
+class PacketSource(RemoteSource): pass

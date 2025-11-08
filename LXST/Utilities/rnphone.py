@@ -25,7 +25,6 @@ class ReticulumTelephone():
     KPD_NUMBERS      = ["0","1","2","3","4","5","6","7","8","9"]
     KPD_HEX_ALPHA    = ["A","B","C","D","E","F"]
     KPD_SYMBOLS      = ["*","#"]
-    KPD_COMMANDS     = ["P","R","M","N","K","-","+"]
 
     RING_TIME        = 30
     WAIT_TIME        = 60
@@ -226,13 +225,8 @@ class ReticulumTelephone():
 
     def enable_keypad(self, driver):
         if self.service: RNS.log(f"Starting keypad: {driver}", RNS.LOG_DEBUG)
-        self.keypad_driver = driver
         if driver == "gpio_4x4":
             from LXST.Primitives.hardware.keypad_gpio_4x4 import Keypad
-            self.keypad = Keypad(callback=self._keypad_event)
-            self.keypad.start()
-        elif driver == "gpio_5x5":
-            from LXST.Primitives.hardware.keypad_gpio_5x5 import Keypad
             self.keypad = Keypad(callback=self._keypad_event)
             self.keypad.start()
         else: raise OSError("Unknown keypad driver specified")
@@ -600,101 +594,52 @@ class ReticulumTelephone():
             self.became_available()
 
         if self.is_ringing:
-            if self.keypad_driver == "gpio_4x4":
-                answer_events  = event[0] == "D" and event[1] == self.keypad.ec.DOWN
-                answer_events |= event[0] == "hook" and event[1] == self.keypad.ec.UP
-                if answer_events:
-                    print(f"Answering call from {RNS.prettyhexrep(self.caller.hash)}")
-                    if not self.telephone.answer(self.caller):
-                        print(f"Could not answer call from {RNS.prettyhexrep(self.caller.hash)}")
-                elif event[0] == "C" and event[1] == self.keypad.ec.DOWN:
-                    print(f"Rejecting call from {RNS.prettyhexrep(self.caller.hash)}")
-                    self.telephone.hangup()
-
-            elif self.keypad_driver == "gpio_5x5":
-                answer_events  = event[0] == "N" and event[1] == self.keypad.ec.DOWN
-                answer_events |= event[0] == "hook" and event[1] == self.keypad.ec.UP
-                if answer_events:
-                    print(f"Answering call from {RNS.prettyhexrep(self.caller.hash)}")
-                    if not self.telephone.answer(self.caller):
-                        print(f"Could not answer call from {RNS.prettyhexrep(self.caller.hash)}")
-                elif event[0] == "K" and event[1] == self.keypad.ec.DOWN:
-                    print(f"Rejecting call from {RNS.prettyhexrep(self.caller.hash)}")
-                    self.telephone.hangup()
+            answer_events  = event[0] == "D" and event[1] == self.keypad.ec.DOWN
+            answer_events |= event[0] == "hook" and event[1] == self.keypad.ec.UP
+            if answer_events:
+                print(f"Answering call from {RNS.prettyhexrep(self.caller.hash)}")
+                if not self.telephone.answer(self.caller):
+                    print(f"Could not answer call from {RNS.prettyhexrep(self.caller.hash)}")
+            elif event[0] == "C" and event[1] == self.keypad.ec.DOWN:
+                print(f"Rejecting call from {RNS.prettyhexrep(self.caller.hash)}")
+                self.telephone.hangup()
 
         elif self.is_in_call or self.call_is_connecting:
-            if self.keypad_driver == "gpio_4x4":
-                hangup_events  = event[0] == "D" and event[1] == self.keypad.ec.DOWN
-                hangup_events |= event[0] == "hook" and event[1] == self.keypad.ec.DOWN
-                if hangup_events:
-                    print(f"Hanging up call with {RNS.prettyhexrep(self.caller.hash)}")
-                    self.telephone.hangup()
-
-            elif self.keypad_driver == "gpio_5x5":
-                hangup_events  = event[0] == "N" and event[1] == self.keypad.ec.DOWN
-                hangup_events |= event[0] == "hook" and event[1] == self.keypad.ec.DOWN
-                if hangup_events:
-                    print(f"Hanging up call with {RNS.prettyhexrep(self.caller.hash)}")
-                    self.telephone.hangup()
+            hangup_events  = event[0] == "D" and event[1] == self.keypad.ec.DOWN
+            hangup_events |= event[0] == "hook" and event[1] == self.keypad.ec.DOWN
+            if hangup_events:
+                print(f"Hanging up call with {RNS.prettyhexrep(self.caller.hash)}")
+                self.telephone.hangup()
 
         elif self.is_available and self.hw_is_idle:
-            if self.keypad_driver == "gpio_4x4":
-                if event[0] == "A" and event[1] == self.keypad.ec.DOWN:
-                    self.hw_input = ""; self.hw_state = self.HW_STATE_DIAL
-                    self._update_display()
-                if event[0] in self.KPD_NUMBERS and event[1] == self.keypad.ec.DOWN:
-                    self.hw_input += event[0]; self.hw_state = self.HW_STATE_DIAL
-                    self._update_display()
+            if event[0] == "A" and event[1] == self.keypad.ec.DOWN:
+                self.hw_input = ""; self.hw_state = self.HW_STATE_DIAL
+                self._update_display()
 
-            if self.keypad_driver == "gpio_5x5":
-                if event[0] == "N" and event[1] == self.keypad.ec.DOWN:
-                    self.hw_input = ""; self.hw_state = self.HW_STATE_DIAL
-                    self._update_display()
-                if event[0] in self.KPD_NUMBERS and event[1] == self.keypad.ec.DOWN:
-                    self.hw_input += event[0]; self.hw_state = self.HW_STATE_DIAL
-                    self._update_display()
+            if event[0] in self.KPD_NUMBERS and event[1] == self.keypad.ec.DOWN:
+                self.hw_input += event[0]; self.hw_state = self.HW_STATE_DIAL
+                self._update_display()
 
         elif self.is_available and self.hw_is_dialing:
             dial_event = False
-            if self.keypad_driver == "gpio_4x4":
-                if event[1] == self.keypad.ec.DOWN:
-                    if event[0] in self.KPD_NUMBERS: self.hw_input += event[0]
-                    if event[0] == "A": self.became_available()
-                    if event[0] == "B": self.hw_input = self.hw_input[:-1]
-                    if event[0] == "C": self.hw_input = ""
-                    if event[0] == "D": dial_event = True
+            if event[1] == self.keypad.ec.DOWN:
+                if event[0] in self.KPD_NUMBERS: self.hw_input += event[0]
+                if event[0] == "A": self.became_available()
+                if event[0] == "B": self.hw_input = self.hw_input[:-1]
+                if event[0] == "C": self.hw_input = ""
+                if event[0] == "D": dial_event = True
 
-                if event[0] == "hook" and event[1] == self.keypad.ec.UP: dial_event = True
+            if event[0] == "hook" and event[1] == self.keypad.ec.UP: dial_event = True
 
-                if dial_event:
-                    for identity_hash in self.aliases:
-                        alias = self.aliases[identity_hash]
-                        if self.hw_input == alias:
-                            self.hw_input = ""
-                            self.hw_state = self.HW_STATE_IDLE
-                            self.dial(identity_hash)
+            if dial_event:
+                for identity_hash in self.aliases:
+                    alias = self.aliases[identity_hash]
+                    if self.hw_input == alias:
+                        self.hw_input = ""
+                        self.hw_state = self.HW_STATE_IDLE
+                        self.dial(identity_hash)
             
-                self._update_display()
-
-            if self.keypad_driver == "gpio_5x5":
-                if event[1] == self.keypad.ec.DOWN:
-                    if event[0] in self.KPD_NUMBERS: self.hw_input += event[0]
-                    if event[0] == "A": self.became_available()
-                    if event[0] == "C": self.hw_input = ""
-                    if event[0] == "K": self.hw_input = self.hw_input[:-1]
-                    if event[0] == "N": dial_event = True
-
-                if event[0] == "hook" and event[1] == self.keypad.ec.UP: dial_event = True
-
-                if dial_event:
-                    for identity_hash in self.aliases:
-                        alias = self.aliases[identity_hash]
-                        if self.hw_input == alias:
-                            self.hw_input = ""
-                            self.hw_state = self.HW_STATE_IDLE
-                            self.dial(identity_hash)
-            
-                self._update_display()
+            self._update_display()
 
     def sigint_handler(self, signal, frame):
         self.cleanup()
