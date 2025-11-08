@@ -2,6 +2,7 @@
 
 LXST is a simple and flexible real-time streaming format and delivery protocol that allows a wide variety of implementations, while using as little bandwidth as possible. It is built on top of [Reticulum](https://reticulum.network) and offers zero-conf stream routing, end-to-end encryption and Forward Secrecy, and can be transported over any kind of medium that Reticulum supports.
 
+- Cross-platform, works on Linux, Android, Windows and Mac
 - Provides a variety of ready-to-use primitives, for easily creating applications such as:
   - Telephony and live voice calls
   - Two-way radio systems
@@ -36,7 +37,7 @@ LXST uses encryption provided by [Reticulum](https://reticulum.network), and thu
 
 ## Project Status & License
 
-This software is in a very early alpha state, and will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
+This software is in a very early alpha state, and will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at [Sideband](https://github.com/markqvist/Sideband) or the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
 
 While under early development, the project is kept under a `CC BY-NC-ND 4.0` license.
 
@@ -48,13 +49,11 @@ If you want to try out LXST, you can install it with pip:
 pip install lxst
 ```
 
-On Raspberry Pi, install various dependencies with:
+On Raspberry Pi (assuming Trixie / Debian 13), install various dependencies with:
 
 ```bash
 # Audio codecs
-sudo apt install python3-pip python3-pyaudio python3-dev python3-cryptography build-essential libopusfile0 libsdl2-dev libavcodec-dev libavdevice-dev libavfilter-dev portaudio19-dev codec2 libcodec2-1.0 xclip xsel
-wget https://raw.githubusercontent.com/markqvist/Sideband/main/docs/utilities/pycodec2-3.0.1-cp311-cp311-linux_aarch64.whl
-pip install ./pycodec2-3.0.1-cp311-cp311-linux_aarch64.whl --break-system-packages
+sudo apt install python3-pyaudio codec2
 
 # For hardware control over I2C:
 pip install smbus2 --break-system-packages # Install smbus module if not already installed
