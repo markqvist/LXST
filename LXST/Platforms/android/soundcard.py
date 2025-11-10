@@ -130,7 +130,10 @@ class _AndroidAudio:
                 self.device_type_descriptions[adi.TYPE_MULTICHANNEL_GROUP] = "Multichannel Group" # 0x20 - API level 36
 
             added_ids = []
-            available_devices = self.AudioManager.getAvailableCommunicationDevices()
+            found_ringer = False
+            virtual_ringers = []
+            if self.android_api_version < 31: available_devices = []
+            else:                             available_devices = self.AudioManager.getAvailableCommunicationDevices()
             for device in available_devices:
                 try:
                     device_id = device.getId(); device_type = device.getType(); channel_counts = device.getChannelCounts()
@@ -144,10 +147,11 @@ class _AndroidAudio:
                                 added_ids.append(device_id)
                                 self.available_devices.append(d)
 
+                                if type_description == "Ringer Speaker": found_ringer = True
                                 if type_description in self.ADD_VIRT_RINGER_TYPES:
                                     d = {"id": device_id+self.VIRTUAL_DEVICE_OFFSET, "name": device.getProductName(), "type": device_type, "type_description": "Ringer Speaker",
                                           "channel_counts": channel_counts, "is_source": device.isSource(), "is_sink": device.isSink(), "is_comms": False, "is_virtual": True}
-                                    self.available_devices.append(d)
+                                    virtual_ringers.append(d)
                 
                 except Exception as e:
                     RNS.log(f"An error occurred while mapping available communications devices: {e}", RNS.LOG_ERROR)
@@ -166,15 +170,27 @@ class _AndroidAudio:
                                      "is_source": device.isSource(), "is_sink": device.isSink(), "is_comms": False, "is_virtual": False}
                                 added_ids.append(device_id)
                                 self.available_devices.append(d)
+
+                                if type_description == "Ringer Speaker": found_ringer = True
+                                if type_description in self.ADD_VIRT_RINGER_TYPES:
+                                    d = {"id": device_id+self.VIRTUAL_DEVICE_OFFSET, "name": device.getProductName(), "type": device_type, "type_description": "Ringer Speaker",
+                                          "channel_counts": channel_counts, "is_source": device.isSource(), "is_sink": device.isSink(), "is_comms": False, "is_virtual": True}
+                                    virtual_ringers.append(d)
                 
                 except Exception as e:
                     RNS.log(f"An error occurred while mapping available audio devices: {e}", RNS.LOG_ERROR)
                     RNS.trace_exception(e)
 
+            if not found_ringer:
+                RNS.log(f"No native ringer output available on device", RNS.LOG_DEBUG)
+                for virtual_ringer in virtual_ringers:
+                    RNS.log(f"Adding virtual ringer {virtual_ringer}", RNS.LOG_DEBUG)
+                    self.available_devices.append(virtual_ringer)
+
             # TODO: Remove debug
-            # RNS.log(f"Discovered audio devices:", RNS.LOG_DEBUG)
-            # for d in self.available_devices:
-            #     RNS.log(f"    {d}", RNS.LOG_DEBUG)
+            RNS.log(f"Discovered audio devices:", RNS.LOG_DEBUG)
+            for d in self.available_devices:
+                RNS.log(f"    {d}", RNS.LOG_DEBUG)
 
         except Exception as e:
             RNS.log(f"Error while initializing Android audio backend: {e}", RNS.LOG_ERROR)
@@ -425,45 +441,110 @@ class _Stream:
                 # selecting matching sources in the setCommunicationDevice API
                 if target_device_info["is_sink"]:
                     target_device_id = target_device_info["id"]
-                    if target_device_info["is_virtual"]: target_device_id -= _audio.VIRTUAL_DEVICE_OFFSET
-                    available_devices = self.AudioManager.getAvailableCommunicationDevices()
-                    for device in available_devices:
-                        device_id = device.getId(); device_type = device.getType()
-                        if target_device_id == device_id:
-                            if _audio.android_api_version >= 34:
-                                RNS.log(f"Running on API level {_audio.android_api_version}, setting via setCommunicationDevice", RNS.LOG_DEBUG)
-                                if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
-                                    self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
-                                    self.audio_mode = "communication"
-                                    self.enabled_comms = True
-                                    RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
-                                
-                                elif target_device_info["type_description"] == "Ringer Speaker":
-                                    self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
-                                    self.audio_mode = "ringer"
-                                    RNS.log("Enabled ringer audio mode", RNS.LOG_DEBUG)
-                                
-                                else:
-                                    self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
-                                    self.audio_mode = "normal"
-                                    RNS.log("Enabled nomal audio mode", RNS.LOG_DEBUG)
-                                
-                                if self.AudioManager.setCommunicationDevice(device):
-                                    RNS.log(f"Successfully configured communication device to: {device} / {device.getType()}", RNS.LOG_DEBUG)
-                                    break
+                    if target_device_info["is_virtual"]:
+                        RNS.log(f"{self} USING VIRTUAL RINGER")
+                        target_device_id -= _audio.VIRTUAL_DEVICE_OFFSET
 
+                    if _audio.android_api_version < 31:
+                        available_devices = self.AudioManager.getDevices(self.AudioManager.GET_DEVICES_ALL)
+                        comms_devices     = []
+                    else:
+                        available_devices = self.AudioManager.getDevices(self.AudioManager.GET_DEVICES_ALL)
+                        comms_devices     = self.AudioManager.getAvailableCommunicationDevices()
+
+                    target_device    = None
+                    is_comms_device  = False
+                    is_ringer_device = False
+
+                    for device in comms_devices:
+                        if target_device_id == device.getId():
+                            target_device = device
+                            is_comms_device = True
+                            break
+
+                    if target_device == None:
+                        for device in available_devices:
+                            if target_device_id == device.getId():
+                                target_device = device
+                                is_comms_device = False
+                                break
+
+                    device_id   = device.getId()
+                    device_type = device.getType()
+
+                    if target_device_info["type_description"] == "Ringer Speaker":
+                        self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
+                        self.audio_mode = "ringer"
+                        RNS.log("Enabled ringer audio mode", RNS.LOG_DEBUG)
+
+                    else:
+                        if _audio.android_api_version >= 34:
+                            if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
+                                self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                                self.audio_mode = "communication"
+                                self.enabled_comms = True
+                                RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+                                if is_comms_device:
+                                    RNS.log(f"Running on API level {_audio.android_api_version}, setting via setCommunicationDevice", RNS.LOG_DEBUG)
+                                    if self.AudioManager.setCommunicationDevice(device):
+                                        RNS.log(f"Successfully configured communication device to: {device} / {device.getType()}", RNS.LOG_DEBUG)
+                            
                             else:
-                                RNS.log(f"Running on API level {_audio.android_api_version}, setting via setSpeakerphoneOn", RNS.LOG_DEBUG)
-                                if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
-                                    self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
-                                    self.AudioManager.setSpeakerphoneOn(False)
-                                    RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
-                                else:
-                                    # API levels < 34, we'll apparently have to set communications mode
-                                    # no matter what, since otherwise the microphone will be muted.
-                                    self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
-                                    self.AudioManager.setSpeakerphoneOn(True)
-                                    RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+                                self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
+                                self.audio_mode = "normal"
+                                RNS.log("Enabled normal audio mode", RNS.LOG_DEBUG)
+
+                        else:
+                            RNS.log(f"Running on API level {_audio.android_api_version}, setting via setSpeakerphoneOn", RNS.LOG_DEBUG)
+                            if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
+                                self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                                self.AudioManager.setSpeakerphoneOn(False)
+                                RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+                            
+                            else:
+                                # API levels < 34, we'll apparently have to set communications mode
+                                # no matter what, since otherwise the microphone will be muted.
+                                self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                                self.AudioManager.setSpeakerphoneOn(True)
+                                RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+
+                    # for device in available_devices:
+                    #     device_id = device.getId(); device_type = device.getType()
+                    #     if target_device_id == device_id:
+                    #         if _audio.android_api_version >= 34:
+                    #             RNS.log(f"Running on API level {_audio.android_api_version}, setting via setCommunicationDevice", RNS.LOG_DEBUG)
+                    #             if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
+                    #                 self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                    #                 self.audio_mode = "communication"
+                    #                 self.enabled_comms = True
+                    #                 RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+                                
+                    #             elif target_device_info["type_description"] == "Ringer Speaker":
+                    #                 self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
+                    #                 self.audio_mode = "ringer"
+                    #                 RNS.log("Enabled ringer audio mode", RNS.LOG_DEBUG)
+                                
+                    #             else:
+                    #                 self.AudioManager.setMode(self.AudioManager.MODE_NORMAL)
+                    #                 self.audio_mode = "normal"
+                    #                 RNS.log("Enabled normal audio mode", RNS.LOG_DEBUG)
+                                
+                    #             if self.AudioManager.setCommunicationDevice(device):
+                    #                 RNS.log(f"Successfully configured communication device to: {device} / {device.getType()}", RNS.LOG_DEBUG)
+                    #                 break
+
+                    #         else:
+                    #             RNS.log(f"Running on API level {_audio.android_api_version}, setting via setSpeakerphoneOn", RNS.LOG_DEBUG)
+                    #             if device_type in _audio.device_type_descriptions and _audio.device_type_descriptions[device_type] in _audio.COMMUNICATION_MODE_TYPES:
+                    #                 self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                    #                 self.AudioManager.setSpeakerphoneOn(False)
+                    #                 RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
+                    #             else:
+                    #                 # API levels < 34, we'll apparently have to set communications mode
+                    #                 # no matter what, since otherwise the microphone will be muted.
+                    #                 self.AudioManager.setMode(self.AudioManager.MODE_IN_COMMUNICATION)
+                    #                 self.AudioManager.setSpeakerphoneOn(True)
+                    #                 RNS.log("Enabled communications audio mode", RNS.LOG_DEBUG)
 
             if self.channels == 1:
                 self.audio_format_out = self.AudioFormat.CHANNEL_OUT_MONO
