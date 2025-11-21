@@ -14,6 +14,89 @@ from LXST.Network import SignallingReceiver, Packetizer, LinkSource
 
 PRIMITIVE_NAME = "telephony"
 
+class Profiles():
+    BANDWIDTH_ULTRA_LOW     = 0x10
+    BANDWIDTH_VERY_LOW   = 0x20
+    BANDWIDTH_LOW         = 0x30
+    QUALITY_MEDIUM        = 0x40
+    QUALITY_HIGH          = 0x50
+    QUALITY_MAX           = 0x60
+    LATENCY_ULTRA_LOW     = 0x70
+    LATENCY_LOW           = 0x80
+
+    DEFAULT_PROFILE       = QUALITY_MEDIUM
+
+    @staticmethod
+    def available_profiles():
+        return [Profiles.BANDWIDTH_ULTRA_LOW,
+                Profiles.BANDWIDTH_VERY_LOW,
+                Profiles.BANDWIDTH_LOW,
+                Profiles.QUALITY_MEDIUM,
+                Profiles.QUALITY_HIGH,
+                Profiles.QUALITY_MAX,
+                Profiles.LATENCY_LOW,
+                Profiles.LATENCY_ULTRA_LOW]
+
+    @staticmethod
+    def profile_index(profile):
+        if profile in Profiles.available_profiles():  return Profiles.available_profiles().index(profile)
+        else:                                         return None
+
+    @staticmethod
+    def profile_name(profile):
+        if   profile == Profiles.BANDWIDTH_ULTRA_LOW: return "Ultra Low Bandwidth"
+        elif profile == Profiles.BANDWIDTH_VERY_LOW:  return "Very Low Bandwidth"
+        elif profile == Profiles.BANDWIDTH_LOW:       return "Low Bandwidth"
+        elif profile == Profiles.QUALITY_MEDIUM:      return "Medium Quality"
+        elif profile == Profiles.QUALITY_HIGH:        return "High Quality"
+        elif profile == Profiles.QUALITY_MAX:         return "Super High Quality"
+        elif profile == Profiles.LATENCY_LOW:         return "Low Latency"
+        elif profile == Profiles.LATENCY_ULTRA_LOW:   return "Ultra Low Latency"
+        else:                                         return "Default"
+
+    @staticmethod
+    def profile_abbrevation(profile):
+        if   profile == Profiles.BANDWIDTH_ULTRA_LOW: return "ULBW"
+        elif profile == Profiles.BANDWIDTH_VERY_LOW:  return "VLBW"
+        elif profile == Profiles.BANDWIDTH_LOW:       return "LBW"
+        elif profile == Profiles.QUALITY_MEDIUM:      return "MQ"
+        elif profile == Profiles.QUALITY_HIGH:        return "HQ"
+        elif profile == Profiles.QUALITY_MAX:         return "SHQ"
+        elif profile == Profiles.LATENCY_LOW:         return "LL"
+        elif profile == Profiles.LATENCY_ULTRA_LOW:   return "ULL"
+        else:                                         return "DFLT"
+
+    @staticmethod
+    def get_codec(profile):
+        if   profile == Profiles.BANDWIDTH_ULTRA_LOW: return Codec2(mode=Codec2.CODEC2_700C)
+        elif profile == Profiles.BANDWIDTH_VERY_LOW:  return Codec2(mode=Codec2.CODEC2_1600)
+        elif profile == Profiles.BANDWIDTH_LOW:       return Codec2(mode=Codec2.CODEC2_3200)
+        elif profile == Profiles.QUALITY_MEDIUM:      return Opus(profile=Opus.PROFILE_VOICE_MEDIUM)
+        elif profile == Profiles.QUALITY_HIGH:        return Opus(profile=Opus.PROFILE_VOICE_HIGH)
+        elif profile == Profiles.QUALITY_MAX:         return Opus(profile=Opus.PROFILE_VOICE_MAX)
+        elif profile == Profiles.LATENCY_LOW:         return Opus(profile=Opus.PROFILE_VOICE_MEDIUM)
+        elif profile == Profiles.LATENCY_ULTRA_LOW:   return Opus(profile=Opus.PROFILE_VOICE_MEDIUM)
+        else:                                         return Opus(profile=Opus.PROFILE_VOICE_MEDIUM)
+
+    @staticmethod
+    def get_frame_time(profile):
+        if   profile == Profiles.BANDWIDTH_ULTRA_LOW: return 400
+        elif profile == Profiles.BANDWIDTH_VERY_LOW:  return 320
+        elif profile == Profiles.BANDWIDTH_LOW:       return 200
+        elif profile == Profiles.QUALITY_MEDIUM:      return 60
+        elif profile == Profiles.QUALITY_HIGH:        return 60
+        elif profile == Profiles.QUALITY_MAX:         return 60
+        elif profile == Profiles.LATENCY_LOW:         return 20
+        elif profile == Profiles.LATENCY_ULTRA_LOW:   return 10
+        else:                                         return 60
+
+    @staticmethod
+    def next_profile(profile):
+        profile_list = Profiles.available_profiles()
+        if profile in profile_list:
+            return profile_list[(Profiles.profile_index(profile)+1)%len(profile_list)]
+        else: return None
+
 class Signalling():
     STATUS_BUSY           = 0x00
     STATUS_REJECTED       = 0x01
@@ -22,8 +105,9 @@ class Signalling():
     STATUS_RINGING        = 0x04
     STATUS_CONNECTING     = 0x05
     STATUS_ESTABLISHED    = 0x06
+    PREFERRED_PROFILE     = 0xFF
     AUTO_STATUS_CODES     = [STATUS_CALLING, STATUS_AVAILABLE, STATUS_RINGING,
-                          STATUS_CONNECTING, STATUS_ESTABLISHED]
+                             STATUS_CONNECTING, STATUS_ESTABLISHED]
 
 class Telephone(SignallingReceiver):
     RING_TIME             = 60
@@ -184,6 +268,8 @@ class Telephone(SignallingReceiver):
         link.is_incoming  = True
         link.is_outgoing  = False
         link.ring_timeout = False
+        link.answered     = False
+        link.profile      = None
         with self.call_handler_lock:
             if self.active_call or self.busy:
                 RNS.log(f"Incoming call, but line is already active, signalling busy", RNS.LOG_DEBUG)
@@ -210,6 +296,7 @@ class Telephone(SignallingReceiver):
                 else:
                     RNS.log(f"Caller identified as {RNS.prettyhexrep(identity.hash)}, ringing", RNS.LOG_DEBUG)
                     self.active_call = link
+                    self.handle_signalling_from(self.active_call)
                     self.__reset_dialling_pipelines()
                     self.signal(Signalling.STATUS_RINGING, self.active_call)
                     self.__activate_ring_tone()
@@ -234,10 +321,15 @@ class Telephone(SignallingReceiver):
 
     @property
     def busy(self):
-        if self.call_status != Signalling.STATUS_AVAILABLE:
-            return True
+        if self.call_status != Signalling.STATUS_AVAILABLE: return True
+        else: return self._external_busy
+
+    @property
+    def active_profile(self):
+        if not self.active_call: return None
         else:
-            return self._external_busy
+            if not hasattr(self.active_call, "profile"): return None
+            else:                                        return self.active_call.profile
     
     def signal(self, signal, link):
         if signal in Signalling.AUTO_STATUS_CODES: self.call_status = signal
@@ -256,6 +348,7 @@ class Telephone(SignallingReceiver):
                 return False
             else:
                 RNS.log(f"Answering call from {RNS.prettyhexrep(identity.hash)}", RNS.LOG_DEBUG)
+                self.active_call.answered = True
                 self.__open_pipelines(identity)
                 self.__start_pipelines()
                 RNS.log(f"Call setup complete for {RNS.prettyhexrep(identity.hash)}", RNS.LOG_DEBUG)
@@ -295,26 +388,19 @@ class Telephone(SignallingReceiver):
     def mute_transmit(self):
         pass
 
-    def select_call_codecs(self):
-        self.receive_codec = Null()
-        
-        # self.transmit_codec = Codec2(mode=Codec2.CODEC2_700C)
-        # self.transmit_codec = Codec2(mode=Codec2.CODEC2_1600)
-        # self.transmit_codec = Codec2(mode=Codec2.CODEC2_3200)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_VOICE_LOW)
-        self.transmit_codec = Opus(profile=Opus.PROFILE_VOICE_MEDIUM)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_VOICE_HIGH)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_VOICE_MAX)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_AUDIO_MIN)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_AUDIO_LOW)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_AUDIO_MEDIUM)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_AUDIO_HIGH)
-        # self.transmit_codec = Opus(profile=Opus.PROFILE_AUDIO_MAX)
-        # self.transmit_codec = Raw()
+    def select_call_profile(self, profile=None):
+        if profile == None: profile = Profiles.DEFAULT_PROFILE
+        self.active_call.profile = profile
+        self.select_call_codecs(self.active_call.profile)
+        self.select_call_frame_time(self.active_call.profile)
+        RNS.log(f"Selected call profile 0x{RNS.hexrep(profile, delimit=False)}", RNS.LOG_DEBUG)
 
-    def select_call_frame_time(self):
-        self.target_frame_time_ms = 60
-        return self.target_frame_time_ms
+    def select_call_codecs(self, profile=None):
+        self.receive_codec = Null()
+        self.transmit_codec = Profiles.get_codec(profile)
+
+    def select_call_frame_time(self, profile=None):
+        self.target_frame_time_ms = Profiles.get_frame_time(profile)
 
     def __reset_dialling_pipelines(self):
         with self.pipeline_lock:
@@ -329,8 +415,7 @@ class Telephone(SignallingReceiver):
             self.__prepare_dialling_pipelines()
 
     def __prepare_dialling_pipelines(self):
-        self.select_call_frame_time()
-        self.select_call_codecs()
+        self.select_call_profile(self.active_call.profile)
         if self.audio_output == None:     self.audio_output = LineSink(preferred_device=self.speaker_device)
         if self.receive_mixer == None:    self.receive_mixer = Mixer(target_frame_ms=self.target_frame_time_ms)
         if self.dial_tone == None:        self.dial_tone = ToneSource(frequency=self.dial_tone_frequency, gain=0.0, ease_time_ms=self.dial_tone_ease_ms, target_frame_ms=self.target_frame_time_ms, codec=Null(), sink=self.receive_mixer)
@@ -434,7 +519,7 @@ class Telephone(SignallingReceiver):
             if self.transmit_pipeline: self.transmit_pipeline.stop()
             RNS.log(f"Audio pipelines stopped", RNS.LOG_DEBUG)
 
-    def call(self, identity):
+    def call(self, identity, profile=None):
         with self.call_handler_lock:
             if not self.active_call:
                 self.call_status = Signalling.STATUS_CALLING
@@ -445,8 +530,7 @@ class Telephone(SignallingReceiver):
                     RNS.Transport.request_path(call_destination.hash)
                     while not RNS.Transport.has_path(call_destination.hash) and time.time() < outgoing_call_timeout: time.sleep(0.2)
                 
-                if not RNS.Transport.has_path(call_destination.hash) and time.time() >= outgoing_call_timeout:
-                    self.hangup()
+                if not RNS.Transport.has_path(call_destination.hash) and time.time() >= outgoing_call_timeout: self.hangup()
                 else:
                     RNS.log(f"Establishing link with {RNS.prettyhexrep(call_destination.hash)}...", RNS.LOG_DEBUG)
                     self.active_call = RNS.Link(call_destination,
@@ -456,6 +540,7 @@ class Telephone(SignallingReceiver):
                     self.active_call.is_incoming  = False
                     self.active_call.is_outgoing  = True
                     self.active_call.ring_timeout = False
+                    self.active_call.profile      = profile
                     self.__timeout_outgoing_call_at(self.active_call, outgoing_call_timeout)
 
     def __outgoing_link_established(self, link):
@@ -468,10 +553,11 @@ class Telephone(SignallingReceiver):
 
     def signalling_received(self, signals, source):
         for signal in signals:
-            if source != self.active_call:
-                RNS.log("Received signalling on non-active call, ignoring", RNS.LOG_DEBUG)
+            if source != self.active_call: RNS.log("Received signalling on non-active call, ignoring", RNS.LOG_DEBUG)
             else:
-                if signal == Signalling.STATUS_BUSY:
+                if self.active_call.is_incoming and not self.active_call.answered and signal < Signalling.PREFERRED_PROFILE:
+                    return
+                elif signal == Signalling.STATUS_BUSY:
                     RNS.log("Remote is busy, terminating", RNS.LOG_DEBUG)
                     self.__play_busy_tone()
                     self.__disable_dial_tone()
@@ -489,8 +575,8 @@ class Telephone(SignallingReceiver):
                     RNS.log("Identification accepted, remote is now ringing", RNS.LOG_DEBUG)
                     self.call_status = signal
                     self.__prepare_dialling_pipelines()
-                    if self.active_call and self.active_call.is_outgoing:
-                        self.__activate_dial_tone()
+                    self.signal(Signalling.PREFERRED_PROFILE+self.active_call.profile, self.active_call)
+                    if self.active_call and self.active_call.is_outgoing: self.__activate_dial_tone()
                 elif signal == Signalling.STATUS_CONNECTING:
                     RNS.log("Call answered, remote is performing call setup, opening audio pipelines", RNS.LOG_DEBUG)
                     self.call_status = signal
@@ -507,6 +593,9 @@ class Telephone(SignallingReceiver):
                         self.call_status = signal
                         if callable(self.__established_callback): self.__established_callback(self.active_call.get_remote_identity())
                         if self.low_latency_output: self.audio_output.enable_low_latency()
+                elif signal >= Signalling.PREFERRED_PROFILE:
+                    self.active_call.profile = signal - Signalling.PREFERRED_PROFILE
+                    self.select_call_profile(self.active_call.profile)
 
     def __str__(self):
         return f"<lxst.telephony/{RNS.hexrep(self.identity.hash, delimit=False)}>"
