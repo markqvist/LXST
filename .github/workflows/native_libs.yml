@@ -107,7 +107,7 @@ jobs:
 
   collect_artifacts:
     name: Collect all wheels
-    needs: [build_windows, build_macos_x86_64, build_macos_arm64, build_sdist]
+    needs: [build_windows, build_macos_x86_64, build_macos_arm64]
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
