@@ -2,7 +2,7 @@ all: release
 
 clean:
 	@echo Cleaning...
-	-sudo rm -rf ./build
+	-rm -rf ./build
 	-rm -rf ./dist
 	-rm -r ./LXST/__pycache__
 
@@ -19,19 +19,20 @@ create_symlinks:
 	-ln -s ../LXST/ ./examples/LXST
 
 build_wheel:
-	cp ./lib/0.4.2/* ./LXST/
+	cp ./lib/static/* ./LXST/
+	touch ./skip_extensions
 	python3 setup.py sdist bdist_wheel
-	-(rm ./LXST/*.so)
-	-(rm ./LXST/*.dll)
-	-(rm ./LXST/*.dylib)
+	rm ./skip_extensions
+	-@(rm ./LXST/*.so)
+	-@(rm ./LXST/*.dll)
 
 native_libs:
 	./march_build.sh
 
 persist_libs:
-	-cp ./libs/dev/*.so ./libs/static/
-	-cp ./libs/dev/*.dll ./libs/static/
-	-cp ./libs/dev/*.dylib ./libs/static/
+	-cp ./lib/dev/*.so ./lib/static/
+	-cp ./lib/dev/*.dll ./lib/static/
+	-cp ./lib/dev/*.dylib ./lib/static/
 
 release: remove_symlinks build_wheel create_symlinks
 
