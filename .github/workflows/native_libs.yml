@@ -37,7 +37,7 @@ jobs:
           python setup.py bdist_wheel
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-wheels-${{ matrix.python-version }}
           path: dist/*.whl
@@ -68,7 +68,7 @@ jobs:
           python setup.py bdist_wheel
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macos-x86_64-wheels-${{ matrix.python-version }}
           path: dist/*.whl
@@ -100,7 +100,7 @@ jobs:
           python setup.py bdist_wheel
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macos-arm64-wheels-${{ matrix.python-version }}
           path: dist/*.whl
@@ -112,7 +112,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
