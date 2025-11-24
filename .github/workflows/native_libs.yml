@@ -1,0 +1,135 @@
+# .github/workflows/build-platforms.yml
+name: Build Windows and macOS binaries
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'libs*' ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [published]
+
+jobs:
+  build_windows:
+    name: Build Windows wheels (Python ${{ matrix.python-version }})
+    runs-on: windows-2019
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cffi wheel setuptools
+
+      - name: Build wheel
+        run: |
+          python setup.py bdist_wheel
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-wheels-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  build_macos_x86_64:
+    name: Build macOS x86_64 wheels (Python ${{ matrix.python-version }})
+    runs-on: macos-13  # Platform for macOS Intel
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cffi wheel setuptools
+
+      - name: Build wheel
+        run: |
+          python setup.py bdist_wheel
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-x86_64-wheels-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  # MACOS BUILDS (Apple Silicon ARM64)
+  build_macos_arm64:
+    name: Build macOS ARM64 wheels (Python ${{ matrix.python-version }})
+    runs-on: macos-14  # Platform for macOS ARM
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cffi wheel setuptools
+
+      - name: Build wheel
+        run: |
+          python setup.py bdist_wheel
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-arm64-wheels-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  collect_artifacts:
+    name: Collect all wheels
+    needs: [build_windows, build_macos_x86_64, build_macos_arm64, build_sdist]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: List all files
+        run: |
+          find ./artifacts -type f
+
+      - name: Create combined wheel directory
+        run: |
+          mkdir -p ./final_wheels
+          find ./artifacts -name "*.whl" -exec cp {} ./final_wheels/ \;
+          find ./artifacts -name "*.tar.gz" -exec cp {} ./final_wheels/ \;
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./final_wheels/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
