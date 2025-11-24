@@ -24,7 +24,7 @@ build_wheel:
 	python3 setup.py sdist bdist_wheel
 	rm ./skip_extensions
 	-@(rm ./LXST/*.so)
-	-@(rm ./LXST/*.dll)
+	-@(rm ./LXST/*.pyd)
 
 native_libs:
 	./march_build.sh

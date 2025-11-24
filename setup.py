@@ -35,8 +35,7 @@ package_data = {
     "Filters.h",
     "Filters.c",
     "filterlib*.so",
-    "filterlib*.dll",
-    "filterlib*.dylib",
+    "filterlib*.pyd",
     ]
 }
 
