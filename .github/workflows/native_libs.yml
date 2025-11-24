@@ -13,7 +13,7 @@ on:
 jobs:
   build_windows:
     name: Build Windows wheels (Python ${{ matrix.python-version }})
-    runs-on: windows-2019
+    runs-on: windows-2022
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
