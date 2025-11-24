@@ -15,7 +15,7 @@ class Mixer(LocalSource, LocalSink):
     MAX_FRAMES = 8
     TYPE_MAP_FACTOR = np.iinfo("int16").max
 
-    def __init__(self, target_frame_ms=40, samplerate=None, codec=None, sink=None):
+    def __init__(self, target_frame_ms=40, samplerate=None, codec=None, sink=None, gain=0.0):
         self.incoming_frames  = {}
         self.target_frame_ms  = target_frame_ms
         self.frame_time       = self.target_frame_ms/1000
@@ -23,6 +23,8 @@ class Mixer(LocalSource, LocalSink):
         self.mixer_thread     = None
         self.mixer_lock       = threading.Lock()
         self.insert_lock      = threading.Lock()
+        self.muted            = False
+        self.gain             = gain
         self.bitdepth         = 32
         self.channels         = None
         self.samplerate       = None
@@ -43,6 +45,18 @@ class Mixer(LocalSource, LocalSink):
 
     def stop(self):
         self.should_run = False
+
+    def set_gain(self, gain=None):
+        if gain == None: self.gain = 0.0
+        else:            self.gain = float(gain)
+
+    def mute(self, mute=True):
+        if mute == True or mute == False: self.muted = mute
+        else:                             self.muted = False
+
+    def unmute(self, unmute=True):
+        if unmute == True or unmute == False: self.muted = unmute
+        else:                                 self.muted = False
 
     def set_source_max_frames(self, source, max_frames):
         with self.insert_lock:
@@ -78,6 +92,12 @@ class Mixer(LocalSource, LocalSink):
 
             self.incoming_frames[source].append(frame_samples)
 
+    @property
+    def _mixing_gain(self):
+        if   self.muted:       return 0.0
+        elif self.gain == 0.0: return 1.0
+        else:                  return 10**(self.gain/10)
+
     def _mixer_job(self):
         with self.mixer_lock:
             while self.should_run:
@@ -87,11 +107,16 @@ class Mixer(LocalSource, LocalSink):
                     for source in self.incoming_frames.copy():
                         if len(self.incoming_frames[source]) > 0:
                             next_frame = self.incoming_frames[source].popleft()
-                            if source_count == 0: mixed_frame = next_frame
-                            else: mixed_frame = mixed_frame + next_frame
+                            if source_count == 0: mixed_frame = next_frame*self._mixing_gain
+                            else: mixed_frame = mixed_frame + next_frame*self._mixing_gain
                             source_count += 1
 
                     if source_count > 0:
+                        mixed_frame = np.clip(mixed_frame, -1.0, 1.0)
+                        if RNS.loglevel >= RNS.LOG_DEBUG:
+                            if mixed_frame.max() >= 1.0 or mixed_frame.min() <= -1.0:
+                                RNS.log(f"Signal clipped on {self}", RNS.LOG_WARNING)
+
                         if self.codec: self.sink.handle_frame(self.codec.encode(mixed_frame), self)
                         else:          self.sink.handle_frame(mixed_frame, self)
                     else:

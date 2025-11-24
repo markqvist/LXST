@@ -152,7 +152,7 @@ class LineSource(LocalSource):
     MAX_FRAMES       = 128
     DEFAULT_FRAME_MS = 80
 
-    def __init__(self, preferred_device=None, target_frame_ms=DEFAULT_FRAME_MS, codec=None, sink=None):
+    def __init__(self, preferred_device=None, target_frame_ms=DEFAULT_FRAME_MS, codec=None, sink=None, filters=None):
         self.preferred_device = preferred_device
         self.frame_deque      = deque(maxlen=self.MAX_FRAMES)
         self.target_frame_ms  = target_frame_ms
@@ -165,6 +165,11 @@ class LineSource(LocalSource):
         self._codec           = None
         self.codec            = codec
         self.sink             = sink
+        self.filters          = None
+
+        if filters != None:
+            if type(filters) == list: self.filters = filters
+            else:                     self.filters = [filters]
 
     @property
     def codec(self): return self._codec
@@ -218,6 +223,8 @@ class LineSource(LocalSource):
             with self.backend.get_recorder(samples_per_frame=backend_samples_per_frame) as recorder:
                 while self.should_run:
                     frame_samples = recorder.record(numframes=self.samples_per_frame)
+                    if self.filters != None:
+                        for f in self.filters: frame_samples = f.handle_frame(frame_samples, self.samplerate)
                     if self.codec:
                         frame = self.codec.encode(frame_samples)
                         if self.sink and self.sink.can_receive(from_source=self):

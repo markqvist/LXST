@@ -1,9 +1,16 @@
 import setuptools
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
+import os
+import platform
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+BUILD_EXTENSIONS = True
 
+with open("README.md", "r") as fh: long_description = fh.read()
 exec(open("LXST/_version.py", "r").read())
+
+if BUILD_EXTENSIONS: extensions = [ Extension("LXST.filterlib", sources=["LXST/Filters.c"], include_dirs=["LXST"], language="c"), ]
+else:                extensions = []
 
 packages = setuptools.find_packages(exclude=[])
 packages.append("LXST.Utilities")
@@ -16,6 +23,13 @@ package_data = {
     "Codecs/libs/pyogg/libs/win_amd64/*",
     "Codecs/libs/pyogg/libs/macos/*",
     "Sounds/*",
+    ],
+"LXST": [
+    "Filters.h",
+    "Filters.c",
+    "filterlib*.so",
+    "filterlib*.dll",
+    "filterlib*.dylib",
     ]
 }
 
@@ -30,6 +44,8 @@ setuptools.setup(
     url="https://git.unsigned.io/markqvist/lxst",
     packages=packages,
     package_data=package_data,
+    ext_modules=extensions,
+    cmdclass={"build_ext": build_ext},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: Other/Proprietary License",
@@ -40,11 +56,12 @@ setuptools.setup(
             'rnphone=LXST.Utilities.rnphone:main',
         ]
     },
-    install_requires=["rns>=1.0.3",
-                      "lxmf>=0.9.1",
+    install_requires=["rns>=1.0.4",
+                      "lxmf>=0.9.3",
                       "soundcard>=0.4.5",
                       "numpy>=2.3.4",
                       "pycodec2>=4.1.0",
-                      "audioop-lts>=0.2.1;python_version>='3.13'"],
-    python_requires=">=3.7",
+                      "audioop-lts>=0.2.1;python_version>='3.13'",
+                      "cffi>=1.17.1"],
+    python_requires=">=3.11",
 )

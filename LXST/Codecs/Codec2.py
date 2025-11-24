@@ -57,7 +57,6 @@ class Codec2(Codec):
         elif frame.shape[1] > self.channels:
             frame = frame[:, 1]
 
-        
         input_samples = frame*self.TYPE_MAP_FACTOR
         input_samples = input_samples.astype(np.int16)
 
@@ -88,7 +87,9 @@ class Codec2(Codec):
     def decode(self, frame_bytes):
         frame_header = frame_bytes[0]
         frame_bytes  = frame_bytes[1:]
-        frame_mode = self.HEADER_MODES[frame_header]
+        
+        if frame_header in self.HEADER_MODES: frame_mode = self.HEADER_MODES[frame_header]
+        else:                                 frame_mode = self.mode
         if self.mode != frame_mode:
             self.set_mode(frame_mode)
 

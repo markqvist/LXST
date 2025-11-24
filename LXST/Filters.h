@@ -1,0 +1,3 @@
+void highpass_filter(float* input, float* output, int samples, int channels, float alpha, float* filter_states, float* last_inputs);
+void lowpass_filter(float* input, float* output, int samples, int channels, float alpha, float* filter_states);
+void agc_process(float* input, float* output, int samples, int channels, float target_linear, float max_gain_linear, float trigger_level, float attack_coeff, float release_coeff, float hold_samples, float* current_gain_lin, int* hold_counter, int block_target);

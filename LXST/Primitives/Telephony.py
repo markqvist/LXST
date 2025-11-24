@@ -11,6 +11,8 @@ from LXST.Sinks import LineSink
 from LXST.Sources import LineSource, OpusFileSource
 from LXST.Generators import ToneSource
 from LXST.Network import SignallingReceiver, Packetizer, LinkSource
+from LXST.Filters import BandPass, AGC
+
 
 PRIMITIVE_NAME = "telephony"
 
@@ -112,6 +114,7 @@ class Signalling():
 class Telephone(SignallingReceiver):
     RING_TIME             = 60
     WAIT_TIME             = 70
+    CONNECT_TIME          = 5
     DIAL_TONE_FREQUENCY   = 382
     DIAL_TONE_EASE_MS     = 3.14159
     JOB_INTERVAL          = 5
@@ -120,7 +123,13 @@ class Telephone(SignallingReceiver):
     ALLOW_ALL             = 0xFF
     ALLOW_NONE            = 0xFE
 
-    def __init__(self, identity, ring_time=RING_TIME, wait_time=WAIT_TIME, auto_answer=None, allowed=ALLOW_ALL):
+    @staticmethod
+    def available_outputs(): return LXST.Sources.Backend().soundcard.all_speakers()
+    
+    @staticmethod
+    def available_inputs(): return LXST.Sinks.Backend().soundcard.all_microphones()
+
+    def __init__(self, identity, ring_time=RING_TIME, wait_time=WAIT_TIME, auto_answer=None, allowed=ALLOW_ALL, receive_gain=0.0, transmit_gain=0.0):
         super().__init__()
         self.identity = identity
         self.destination = RNS.Destination(self.identity, RNS.Destination.IN, RNS.Destination.SINGLE, APP_NAME, PRIMITIVE_NAME)
@@ -132,16 +141,22 @@ class Telephone(SignallingReceiver):
         self.call_handler_lock = threading.Lock()
         self.pipeline_lock = threading.Lock()
         self.caller_pipeline_open_lock = threading.Lock()
+        self.establishment_timeout = self.CONNECT_TIME
         self.links = {}
         self.ring_time = ring_time
         self.wait_time = wait_time
         self.auto_answer = auto_answer
+        self.receive_gain = receive_gain
+        self.transmit_gain = transmit_gain
+        self.use_agc = True
         self.active_call = None
         self.call_status = Signalling.STATUS_AVAILABLE
         self._external_busy = False
         self.__ringing_callback = None
         self.__established_callback = None
         self.__ended_callback = None
+        self.__busy_callback = None
+        self.__rejected_callback = None
         self.target_frame_time_ms = None
         self.audio_output = None
         self.audio_input = None
@@ -184,6 +199,9 @@ class Telephone(SignallingReceiver):
         if type(blocked) == list or blocked == None: self.blocked = blocked
         else: raise TypeError(f"Invalid type for blocked callers: {type(blocked)}")
 
+    def set_connect_timeout(self, timeout):
+        self.establishment_timeout = timeout
+
     def set_announce_interval(self, announce_interval):
         if not type(announce_interval) == int: raise TypeError(f"Invalid type for announce interval: {announce_interval}")
         else:
@@ -202,6 +220,14 @@ class Telephone(SignallingReceiver):
         if not callable(callback): raise TypeError(f"Invalid callback, {callback} is not callable")
         self.__ended_callback = callback
 
+    def set_busy_callback(self, callback):
+        if not callable(callback): raise TypeError(f"Invalid callback, {callback} is not callable")
+        self.__busy_callback = callback
+
+    def set_rejected_callback(self, callback):
+        if not callable(callback): raise TypeError(f"Invalid callback, {callback} is not callable")
+        self.__rejected_callback = callback
+
     def set_speaker(self, device):
         self.speaker_device = device
         RNS.log(f"{self} speaker device set to {device}", RNS.LOG_DEBUG)
@@ -214,10 +240,18 @@ class Telephone(SignallingReceiver):
         self.ringer_device = device
         RNS.log(f"{self} ringer device set to {device}", RNS.LOG_DEBUG)
 
-    def set_ringtone(self, ringtone_path, gain=1.0):
+    def set_ringtone(self, ringtone_path, gain=0.0):
         self.ringtone_path = ringtone_path
         self.ringtone_gain = gain
         RNS.log(f"{self} ringtone set to {self.ringtone_path}", RNS.LOG_DEBUG)
+
+    def enable_agc(self, enable=True):
+        if enable == True: self.use_agc = True
+        else:              self.use_agc = False
+
+    def disable_agc(self, disable=True):
+        if disable == True: self.use_agc = False
+        else:               self.use_agc = True
 
     def set_low_latency_output(self, enabled):
         if enabled:
@@ -243,9 +277,7 @@ class Telephone(SignallingReceiver):
 
     def __timeout_incoming_call_at(self, call, timeout):
         def job():
-            while time.time()<timeout and self.active_call == call:
-                time.sleep(0.25)
-
+            while time.time()<timeout and self.active_call == call: time.sleep(0.25)
             if self.active_call == call and self.call_status < Signalling.STATUS_ESTABLISHED:
                 RNS.log(f"Ring timeout on call from {RNS.prettyhexrep(self.active_call.hash)}, hanging up", RNS.LOG_DEBUG)
                 self.active_call.ring_timeout = True
@@ -255,21 +287,29 @@ class Telephone(SignallingReceiver):
 
     def __timeout_outgoing_call_at(self, call, timeout):
         def job():
-            while time.time()<timeout and self.active_call == call:
-                time.sleep(0.25)
-
+            while time.time()<timeout and self.active_call == call: time.sleep(0.25)
             if self.active_call == call and self.call_status < Signalling.STATUS_ESTABLISHED:
                 RNS.log(f"Timeout on outgoing call to {RNS.prettyhexrep(self.active_call.hash)}, hanging up", RNS.LOG_DEBUG)
                 self.hangup()
 
         threading.Thread(target=job, daemon=True).start()
 
+    def __timeout_outgoing_establishment_at(self, call, timeout):
+        def job():
+            while time.time()<timeout and self.active_call == call: time.sleep(0.25)
+            if self.active_call == call and self.call_status < Signalling.STATUS_RINGING:
+                RNS.log(f"Timeout on outgoing connection establishment to {RNS.prettyhexrep(self.active_call.hash)}, hanging up", RNS.LOG_DEBUG)
+                self.hangup()
+
+        threading.Thread(target=job, daemon=True).start()
+
     def __incoming_link_established(self, link):
-        link.is_incoming  = True
-        link.is_outgoing  = False
-        link.ring_timeout = False
-        link.answered     = False
-        link.profile      = None
+        link.is_incoming    = True
+        link.is_outgoing    = False
+        link.ring_timeout   = False
+        link.answered       = False
+        link.is_terminating = False
+        link.profile        = None
         with self.call_handler_lock:
             if self.active_call or self.busy:
                 RNS.log(f"Incoming call, but line is already active, signalling busy", RNS.LOG_DEBUG)
@@ -314,7 +354,7 @@ class Telephone(SignallingReceiver):
     def __link_closed(self, link):
         if link == self.active_call:
             RNS.log(f"Remote for {RNS.prettyhexrep(link.get_remote_identity().hash)} hung up", RNS.LOG_DEBUG)
-            self.hangup()
+            if not self.active_call.is_terminating: self.hangup()
 
     def set_busy(self, busy):
         self._external_busy = busy
@@ -356,7 +396,7 @@ class Telephone(SignallingReceiver):
                 if self.low_latency_output: self.audio_output.enable_low_latency()
                 return True
 
-    def hangup(self):
+    def hangup(self, reason=None):
         if self.active_call:
             with self.call_handler_lock:
                 terminating_call = self.active_call; self.active_call = None
@@ -375,31 +415,61 @@ class Telephone(SignallingReceiver):
                 self.audio_output = None
                 self.dial_tone = None
                 self.call_status = Signalling.STATUS_AVAILABLE
-                if remote_identity:
-                    RNS.log(f"Call with {RNS.prettyhexrep(remote_identity.hash)} terminated", RNS.LOG_DEBUG)
-                else:
-                    RNS.log(f"Outgoing call could not be connected, link establishment failed", RNS.LOG_DEBUG)
+                if remote_identity: RNS.log(f"Call with {RNS.prettyhexrep(remote_identity.hash)} terminated", RNS.LOG_DEBUG)
+                else: RNS.log(f"Outgoing call could not be connected, link establishment failed", RNS.LOG_DEBUG)
         
-            if callable(self.__ended_callback): self.__ended_callback(remote_identity)
+            if reason == None:
+                if callable(self.__ended_callback):      self.__ended_callback(remote_identity)
+            elif reason == Signalling.STATUS_BUSY:
+                if   callable(self.__busy_callback):     self.__busy_callback(remote_identity)
+                elif callable(self.__ended_callback):    self.__ended_callback(remote_identity)
+            elif reason == Signalling.STATUS_REJECTED:
+                if   callable(self.__rejected_callback): self.__rejected_callback(remote_identity)
+                elif callable(self.__ended_callback):    self.__ended_callback(remote_identity)
 
-    def mute_receive(self):
-        pass
+    def mute_receive(self, mute=True):
+        if self.receive_mixer: self.receive_mixer.mute(mute)
 
-    def mute_transmit(self):
-        pass
+    def unmute_receive(self, unmute=True):
+        if self.receive_mixer: self.receive_mixer.unmute(mute)
 
-    def select_call_profile(self, profile=None):
+    def mute_transmit(self, mute=True):
+        if self.transmit_mixer: self.transmit_mixer.mute(mute)
+
+    def unmute_transmit(self, unmute=True):
+        if self.transmit_mixer: self.transmit_mixer.unmute(unmute)
+
+    def set_receive_gain(self, gain=0.0):
+        self.receive_gain = float(gain)
+        if self.receive_mixer: self.receive_mixer.set_gain(self.receive_gain)
+
+    def set_transmit_gain(self, gain=0.0):
+        self.transmit_gain = float(gain)
+        if self.transmit_mixer: self.transmit_mixer.set_gain(self.transmit_gain)
+
+    def switch_profile(self, profile=None, from_signalling=False):
+        if self.active_call:
+            if self.active_call.profile == profile: return
+            else:
+                if self.call_status == Signalling.STATUS_ESTABLISHED:
+                    self.active_call.profile = profile
+                    self.transmit_codec = Profiles.get_codec(self.active_call.profile)
+                    self.target_frame_time_ms = Profiles.get_frame_time(self.active_call.profile)
+                    if not from_signalling: self.signal(Signalling.PREFERRED_PROFILE+self.active_call.profile, self.active_call)
+                    self.__reconfigure_transmit_pipeline()
+
+    def __select_call_profile(self, profile=None):
         if profile == None: profile = Profiles.DEFAULT_PROFILE
         self.active_call.profile = profile
-        self.select_call_codecs(self.active_call.profile)
-        self.select_call_frame_time(self.active_call.profile)
+        self.__select_call_codecs(self.active_call.profile)
+        self.__select_call_frame_time(self.active_call.profile)
         RNS.log(f"Selected call profile 0x{RNS.hexrep(profile, delimit=False)}", RNS.LOG_DEBUG)
 
-    def select_call_codecs(self, profile=None):
+    def __select_call_codecs(self, profile=None):
         self.receive_codec = Null()
         self.transmit_codec = Profiles.get_codec(profile)
 
-    def select_call_frame_time(self, profile=None):
+    def __select_call_frame_time(self, profile=None):
         self.target_frame_time_ms = Profiles.get_frame_time(profile)
 
     def __reset_dialling_pipelines(self):
@@ -415,9 +485,9 @@ class Telephone(SignallingReceiver):
             self.__prepare_dialling_pipelines()
 
     def __prepare_dialling_pipelines(self):
-        self.select_call_profile(self.active_call.profile)
+        self.__select_call_profile(self.active_call.profile)
         if self.audio_output == None:     self.audio_output = LineSink(preferred_device=self.speaker_device)
-        if self.receive_mixer == None:    self.receive_mixer = Mixer(target_frame_ms=self.target_frame_time_ms)
+        if self.receive_mixer == None:    self.receive_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.receive_gain)
         if self.dial_tone == None:        self.dial_tone = ToneSource(frequency=self.dial_tone_frequency, gain=0.0, ease_time_ms=self.dial_tone_ease_ms, target_frame_ms=self.target_frame_time_ms, codec=Null(), sink=self.receive_mixer)
         if self.receive_pipeline == None: self.receive_pipeline = Pipeline(source=self.receive_mixer, codec=Null(), sink=self.audio_output)
 
@@ -473,6 +543,20 @@ class Telephone(SignallingReceiver):
         if self.dial_tone and self.dial_tone.running:
             self.dial_tone.stop()
 
+    def __reconfigure_transmit_pipeline(self):
+        if self.transmit_pipeline and self.call_status == Signalling.STATUS_ESTABLISHED:
+            self.audio_input.stop()
+            self.transmit_mixer.stop()
+            self.transmit_pipeline.stop()
+            self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
+            self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer, filters=self.active_call.filters)
+            self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
+                                              codec=self.transmit_codec,
+                                              sink=self.active_call.packetizer)
+            self.transmit_mixer.start()
+            self.audio_input.start()
+            self.transmit_pipeline.start()
+
     def __open_pipelines(self, identity):
         with self.pipeline_lock:
             if not self.active_call.get_remote_identity() == identity:
@@ -485,12 +569,16 @@ class Telephone(SignallingReceiver):
                     RNS.log(f"Opening audio pipelines for call with {RNS.prettyhexrep(identity.hash)}", RNS.LOG_DEBUG)
                     if self.active_call.is_incoming: self.signal(Signalling.STATUS_CONNECTING, self.active_call)
 
+                    if self.use_agc: self.active_call.filters = [BandPass(250, 8500), AGC()]
+                    else:            self.active_call.filters = [BandPass(250, 8500)]
+
                     self.__prepare_dialling_pipelines()
-                    self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms)
-                    self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer)
+                    self.active_call.packetizer = Packetizer(self.active_call, failure_callback=self.__packetizer_failure)
+                    self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
+                    self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer, filters=self.active_call.filters)
                     self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
                                                       codec=self.transmit_codec,
-                                                      sink=Packetizer(self.active_call, failure_callback=self.__packetizer_failure))
+                                                      sink=self.active_call.packetizer)
                     
                     self.active_call.audio_source = LinkSource(link=self.active_call, signalling_receiver=self, sink=self.receive_mixer)
                     self.receive_mixer.set_source_max_frames(self.active_call.audio_source, 2)
@@ -524,6 +612,7 @@ class Telephone(SignallingReceiver):
             if not self.active_call:
                 self.call_status = Signalling.STATUS_CALLING
                 outgoing_call_timeout = time.time()+self.wait_time
+                outgoing_establishment_timeout = time.time()+self.establishment_timeout
                 call_destination = RNS.Destination(identity, RNS.Destination.OUT, RNS.Destination.SINGLE, APP_NAME, PRIMITIVE_NAME)
                 if not RNS.Transport.has_path(call_destination.hash):
                     RNS.log(f"No path known for call to {RNS.prettyhexrep(call_destination.hash)}, requesting path...", RNS.LOG_DEBUG)
@@ -537,11 +626,13 @@ class Telephone(SignallingReceiver):
                                                 established_callback=self.__outgoing_link_established,
                                                 closed_callback=self.__outgoing_link_closed)
                     
-                    self.active_call.is_incoming  = False
-                    self.active_call.is_outgoing  = True
-                    self.active_call.ring_timeout = False
-                    self.active_call.profile      = profile
+                    self.active_call.is_incoming    = False
+                    self.active_call.is_outgoing    = True
+                    self.active_call.is_terminating = False
+                    self.active_call.ring_timeout   = False
+                    self.active_call.profile        = profile
                     self.__timeout_outgoing_call_at(self.active_call, outgoing_call_timeout)
+                    self.__timeout_outgoing_establishment_at(self.active_call, outgoing_establishment_timeout)
 
     def __outgoing_link_established(self, link):
         RNS.log(f"Link established for call with {link.get_remote_identity()}", RNS.LOG_DEBUG)
@@ -559,14 +650,15 @@ class Telephone(SignallingReceiver):
                     return
                 elif signal == Signalling.STATUS_BUSY:
                     RNS.log("Remote is busy, terminating", RNS.LOG_DEBUG)
+                    self.active_call.is_terminating = True
                     self.__play_busy_tone()
                     self.__disable_dial_tone()
-                    self.hangup()
+                    self.hangup(reason=Signalling.STATUS_BUSY)
                 elif signal == Signalling.STATUS_REJECTED:
                     RNS.log("Remote rejected call, terminating", RNS.LOG_DEBUG)
                     self.__play_busy_tone()
                     self.__disable_dial_tone()
-                    self.hangup()
+                    self.hangup(reason=Signalling.STATUS_REJECTED)
                 elif signal == Signalling.STATUS_AVAILABLE:
                     RNS.log("Line available, sending identification", RNS.LOG_DEBUG)
                     self.call_status = signal
@@ -594,8 +686,9 @@ class Telephone(SignallingReceiver):
                         if callable(self.__established_callback): self.__established_callback(self.active_call.get_remote_identity())
                         if self.low_latency_output: self.audio_output.enable_low_latency()
                 elif signal >= Signalling.PREFERRED_PROFILE:
-                    self.active_call.profile = signal - Signalling.PREFERRED_PROFILE
-                    self.select_call_profile(self.active_call.profile)
+                    profile = signal - Signalling.PREFERRED_PROFILE
+                    if self.active_call and self.call_status == Signalling.STATUS_ESTABLISHED: self.switch_profile(profile, from_signalling=True)
+                    else:                                                                      self.__select_call_profile(profile)
 
     def __str__(self):
         return f"<lxst.telephony/{RNS.hexrep(self.identity.hash, delimit=False)}>"
