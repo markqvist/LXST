@@ -370,6 +370,20 @@ class Telephone(SignallingReceiver):
         else:
             if not hasattr(self.active_call, "profile"): return None
             else:                                        return self.active_call.profile
+
+    @property
+    def receive_muted(self):
+        if not self.active_call: return False
+        else:
+            if not self.receive_mixer: return False
+            else: return self.receive_mixer.muted
+
+    @property
+    def transmit_muted(self):
+        if not self.active_call: return False
+        else:
+            if not self.transmit_mixer: return False
+            else: return self.transmit_mixer.muted
     
     def signal(self, signal, link):
         if signal in Signalling.AUTO_STATUS_CODES: self.call_status = signal
@@ -431,7 +445,7 @@ class Telephone(SignallingReceiver):
         if self.receive_mixer: self.receive_mixer.mute(mute)
 
     def unmute_receive(self, unmute=True):
-        if self.receive_mixer: self.receive_mixer.unmute(mute)
+        if self.receive_mixer: self.receive_mixer.unmute(unmute)
 
     def mute_transmit(self, mute=True):
         if self.transmit_mixer: self.transmit_mixer.mute(mute)

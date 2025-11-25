@@ -165,11 +165,12 @@ class BandPass(Filter):
     
     def handle_frame(self, frame, samplerate):
         # TODO: Remove debug
-        # st = time.time()
+        st = time.time()
         if len(frame) == 0: return frame        
         high_passed    = self._high_pass.handle_frame(frame, samplerate)        
         band_passed    = self._low_pass.handle_frame(high_passed, samplerate)
-        # RNS.log(f"Filter ran in {RNS.prettyshorttime(time.time()-st)}", RNS.LOG_DEBUG)
+        dt = time.time()-st
+        if dt > 0.010: RNS.log(f"Slow filter processing detected: Filter ran in {RNS.prettyshorttime(time.time()-st)}", RNS.LOG_DEBUG)
         return band_passed
 
 class AGC(Filter):
