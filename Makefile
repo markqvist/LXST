@@ -24,7 +24,14 @@ build_wheel:
 	python3 setup.py sdist bdist_wheel
 	rm ./skip_extensions
 	-@(rm ./LXST/*.so)
-	-@(rm ./LXST/*.pyd)
+	-@(rm ./LXST/*.dll)
+
+windll:
+	cl /LD LXST/Filters.c LXST/Filters.def /Fefilterlib.dll
+	mv ./filterlib.dll ./lib/dev/
+	rm ./filterlib.exp
+	rm ./filterlib.lib
+	rm ./filterlib.obj
 
 native_libs:
 	./march_build.sh
@@ -32,7 +39,6 @@ native_libs:
 persist_libs:
 	-cp ./lib/dev/*.so ./lib/static/
 	-cp ./lib/dev/*.dll ./lib/static/
-	-cp ./lib/dev/*.dylib ./lib/static/
 
 release: remove_symlinks build_wheel create_symlinks
 

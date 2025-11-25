@@ -16,15 +16,15 @@ else:
         ffi = FFI()
 
         try:
-            # Disable native filterlib loading on Windows
-            # for now due to strange linking behaviour,
-            # but allow local compilation if the user has
-            # a C compiler installed.
             if not RNS.vendor.platformutils.is_windows():
                 filterlib_spec = find_spec("LXST.filterlib")
                 if not filterlib_spec or filterlib_spec.origin == None: raise ImportError("Could not locate pre-compiled LXST.filterlib module")
                 with open(os.path.join(c_src_path, "Filters.h"), "r") as f: ffi.cdef(f.read())
                 native_functions = ffi.dlopen(filterlib_spec.origin)
+                USE_NATIVE_FILTERS = True
+            else:
+                with open(os.path.join(c_src_path, "Filters.h"), "r") as f: ffi.cdef(f.read())
+                native_functions = ffi.dlopen(os.path.join(c_src_path, "filterlib.dll"))
                 USE_NATIVE_FILTERS = True
         
         except Exception as e:

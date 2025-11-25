@@ -1,3 +1,33 @@
+# Reticulum License
+#
+# Copyright (c) 2025 Mark Qvist
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# - The Software shall not be used in any kind of system which includes amongst
+#   its functions the ability to purposefully do harm to human beings.
+#
+# - The Software shall not be used, directly or indirectly, in the creation of
+#   an artificial intelligence, machine learning or language model training
+#   dataset, including but not limited to any use that contributes to the
+#   training or development of such a model or algorithm.
+#
+# - The above copyright notice and this permission notice shall be included in
+#   all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import atexit
 import collections.abc
 import time
@@ -81,28 +111,28 @@ class _AndroidAudio:
 
             # Populate device type descriptions from JNI
             self.device_type_descriptions = {
-                adi.TYPE_AUX_LINE: "Aux Line", # 0x13 - API level 23
-                adi.TYPE_BLUETOOTH_A2DP: "Bluetooth A2DP", # 0x08 - API level 23
-                adi.TYPE_BLUETOOTH_SCO: "Bluetooth SCO", # 0x07 - API level 23
+                adi.TYPE_AUX_LINE: "Aux Line",                  # 0x13 - API level 23
+                adi.TYPE_BLUETOOTH_A2DP: "Bluetooth A2DP",      # 0x08 - API level 23
+                adi.TYPE_BLUETOOTH_SCO: "Bluetooth SCO",        # 0x07 - API level 23
                 adi.TYPE_BUILTIN_EARPIECE: "Internal Earpiece", # 0x01 - API level 23
-                adi.TYPE_BUILTIN_MIC: "Internal Microphone", # 0x0f - API level 23
-                adi.TYPE_BUILTIN_SPEAKER: "Internal Speaker", # 0x02 - API level 23
-                adi.TYPE_DOCK: "Dock", # 0x0d - API level 23
-                adi.TYPE_FM: "FM", # 0x0e - API level 23
-                adi.TYPE_FM_TUNER: "FM Tuner", # 0x10 - API level 23
-                adi.TYPE_HDMI: "HDMI", # 0x09 - API level 23
-                adi.TYPE_HDMI_ARC: "HDMI ARC", # 0x0a - API level 23
-                adi.TYPE_IP: "IP", # 0x14 - API level 23
-                adi.TYPE_LINE_ANALOG: "Analog Line", # 0x05 - API level 23
-                adi.TYPE_LINE_DIGITAL: "Digital Line", # 0x06 - API level 23
-                adi.TYPE_TELEPHONY: "Telephony", # 0x12 - API level 23
-                adi.TYPE_TV_TUNER: "TV Tuner", # 0x11 - API level 23
-                adi.TYPE_UNKNOWN: "Unknown", # 0x00 - API level 23
-                adi.TYPE_USB_ACCESSORY: "USB Accessory", # 0x0c - API level 23
-                adi.TYPE_USB_DEVICE: "USB Device", # 0x0b - API level 23
-                adi.TYPE_WIRED_HEADPHONES: "Wired Headphones", # 0x04 - API level 23
-                adi.TYPE_WIRED_HEADSET: "Wired Headset", # 0x03 - API level 23
-                adi.TYPE_BUS: "Bus", # 0x15 - API level 24
+                adi.TYPE_BUILTIN_MIC: "Internal Microphone",    # 0x0f - API level 23
+                adi.TYPE_BUILTIN_SPEAKER: "Internal Speaker",   # 0x02 - API level 23
+                adi.TYPE_DOCK: "Dock",                          # 0x0d - API level 23
+                adi.TYPE_FM: "FM",                              # 0x0e - API level 23
+                adi.TYPE_FM_TUNER: "FM Tuner",                  # 0x10 - API level 23
+                adi.TYPE_HDMI: "HDMI",                          # 0x09 - API level 23
+                adi.TYPE_HDMI_ARC: "HDMI ARC",                  # 0x0a - API level 23
+                adi.TYPE_IP: "IP",                              # 0x14 - API level 23
+                adi.TYPE_LINE_ANALOG: "Analog Line",            # 0x05 - API level 23
+                adi.TYPE_LINE_DIGITAL: "Digital Line",          # 0x06 - API level 23
+                adi.TYPE_TELEPHONY: "Telephony",                # 0x12 - API level 23
+                adi.TYPE_TV_TUNER: "TV Tuner",                  # 0x11 - API level 23
+                adi.TYPE_UNKNOWN: "Unknown",                    # 0x00 - API level 23
+                adi.TYPE_USB_ACCESSORY: "USB Accessory",        # 0x0c - API level 23
+                adi.TYPE_USB_DEVICE: "USB Device",              # 0x0b - API level 23
+                adi.TYPE_WIRED_HEADPHONES: "Wired Headphones",  # 0x04 - API level 23
+                adi.TYPE_WIRED_HEADSET: "Wired Headset",        # 0x03 - API level 23
+                adi.TYPE_BUS: "Bus",                            # 0x15 - API level 24
             }
 
             if self.android_api_version >= 26:
@@ -115,9 +145,9 @@ class _AndroidAudio:
                 self.device_type_descriptions[adi.TYPE_BUILTIN_SPEAKER_SAFE] = "Ringer Speaker" # 0x18 - API level 30
 
             if self.android_api_version >= 31:
-                self.device_type_descriptions[adi.TYPE_BLE_HEADSET] = "BLE Headset" # 0x1a - API level 31
-                self.device_type_descriptions[adi.TYPE_BLE_SPEAKER] = "BLE Speaker" # 0x1b - API level 31
-                self.device_type_descriptions[adi.TYPE_HDMI_EARC] = "HDMI EARC" # 0x1d - API level 31
+                self.device_type_descriptions[adi.TYPE_BLE_HEADSET] = "BLE Headset"     # 0x1a - API level 31
+                self.device_type_descriptions[adi.TYPE_BLE_SPEAKER] = "BLE Speaker"     # 0x1b - API level 31
+                self.device_type_descriptions[adi.TYPE_HDMI_EARC] = "HDMI EARC"         # 0x1d - API level 31
                 self.device_type_descriptions[adi.TYPE_REMOTE_SUBMIX] = "Remote Submix" # 0x19 - API level 31
 
             if self.android_api_version >= 33:
