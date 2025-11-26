@@ -39,10 +39,8 @@ class SignallingReceiver():
             if type(unpacked) == dict:
                 if FIELD_SIGNALLING in unpacked:
                     signalling = unpacked[FIELD_SIGNALLING]
-                    if type(signalling) == list:
-                        self.signalling_received(signalling, source)
-                    else:
-                        self.signalling_received([signalling], source)
+                    if type(signalling) == list: self.signalling_received(signalling, source)
+                    else:                        self.signalling_received([signalling], source)
 
         except Exception as e:
             RNS.log(f"{self} could not process incoming packet: {e}", RNS.LOG_ERROR)

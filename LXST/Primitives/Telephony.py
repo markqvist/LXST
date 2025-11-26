@@ -176,6 +176,8 @@ class Telephone(SignallingReceiver):
         self.transmit_mixer = None
         self.receive_pipeline = None
         self.transmit_pipeline = None
+        self.__receive_muted = False
+        self.__transmit_muted = False
         self.ringer_lock = threading.Lock()
         self.ringer_output = None
         self.ringer_pipeline = None
@@ -432,13 +434,15 @@ class Telephone(SignallingReceiver):
                 
                 if terminating_call.status == RNS.Link.ACTIVE: terminating_call.teardown()
                 self.__stop_pipelines()
-                self.receive_mixer = None
-                self.transmit_mixer = None
-                self.receive_pipeline = None
+                self.receive_mixer     = None
+                self.transmit_mixer    = None
+                self.receive_pipeline  = None
                 self.transmit_pipeline = None
-                self.audio_output = None
-                self.dial_tone = None
-                self.call_status = Signalling.STATUS_AVAILABLE
+                self.audio_output      = None
+                self.dial_tone         = None
+                self.call_status       = Signalling.STATUS_AVAILABLE
+                self.__receive_muted   = False
+                self.__transmit_muted  = False
                 if remote_identity: RNS.log(f"Call with {RNS.prettyhexrep(remote_identity.hash)} terminated", RNS.LOG_DEBUG)
                 else: RNS.log(f"Outgoing call could not be connected, link establishment failed", RNS.LOG_DEBUG)
         
@@ -452,15 +456,19 @@ class Telephone(SignallingReceiver):
                 elif callable(self.__ended_callback):    self.__ended_callback(remote_identity)
 
     def mute_receive(self, mute=True):
+        self.__receive_muted = mute
         if self.receive_mixer: self.receive_mixer.mute(mute)
 
     def unmute_receive(self, unmute=True):
+        self.__receive_muted = not unmute
         if self.receive_mixer: self.receive_mixer.unmute(unmute)
 
     def mute_transmit(self, mute=True):
+        self.__transmit_muted = mute
         if self.transmit_mixer: self.transmit_mixer.mute(mute)
 
     def unmute_transmit(self, unmute=True):
+        self.__transmit_muted = not unmute
         if self.transmit_mixer: self.transmit_mixer.unmute(unmute)
 
     def set_receive_gain(self, gain=0.0):
@@ -510,16 +518,16 @@ class Telephone(SignallingReceiver):
 
     def __prepare_dialling_pipelines(self):
         self.__select_call_profile(self.active_call.profile)
-        if self.audio_output == None:     self.audio_output = LineSink(preferred_device=self.speaker_device)
-        if self.receive_mixer == None:    self.receive_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.receive_gain)
-        if self.dial_tone == None:        self.dial_tone = ToneSource(frequency=self.dial_tone_frequency, gain=0.0, ease_time_ms=self.dial_tone_ease_ms, target_frame_ms=self.target_frame_time_ms, codec=Null(), sink=self.receive_mixer)
+        if self.audio_output     == None: self.audio_output = LineSink(preferred_device=self.speaker_device)
+        if self.receive_mixer    == None: self.receive_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.receive_gain)
+        if self.dial_tone        == None: self.dial_tone = ToneSource(frequency=self.dial_tone_frequency, gain=0.0, ease_time_ms=self.dial_tone_ease_ms, target_frame_ms=self.target_frame_time_ms, codec=Null(), sink=self.receive_mixer)
         if self.receive_pipeline == None: self.receive_pipeline = Pipeline(source=self.receive_mixer, codec=Null(), sink=self.audio_output)
 
     def __activate_ring_tone(self):
         if self.ringtone_path != None and os.path.isfile(self.ringtone_path):
             if not self.ringer_pipeline:
                 if not self.ringer_output: self.ringer_output = LineSink(preferred_device=self.ringer_device)
-                self.ringer_source = OpusFileSource(self.ringtone_path, loop=True, target_frame_ms=60)
+                self.ringer_source   = OpusFileSource(self.ringtone_path, loop=True, target_frame_ms=60)
                 self.ringer_pipeline = Pipeline(source=self.ringer_source, codec=Null(), sink=self.ringer_output)
 
             def job():
@@ -578,6 +586,8 @@ class Telephone(SignallingReceiver):
             self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
                                               codec=self.transmit_codec,
                                               sink=self.active_call.packetizer)
+
+            self.transmit_mixer.mute(self.__transmit_muted)
             self.transmit_mixer.start()
             self.audio_input.start()
             self.transmit_pipeline.start()
