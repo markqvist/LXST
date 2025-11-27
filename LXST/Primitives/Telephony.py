@@ -581,11 +581,12 @@ class Telephone(SignallingReceiver):
             self.audio_input.stop()
             self.transmit_mixer.stop()
             self.transmit_pipeline.stop()
-            self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
-            self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer, filters=self.active_call.filters)
-            self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
-                                              codec=self.transmit_codec,
-                                              sink=self.active_call.packetizer)
+            self.transmit_mixer    =      Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
+
+            self.audio_input       = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(),
+                                                sink=self.transmit_mixer, filters=self.active_call.filters, skip=0.075, ease_in=0.0)
+
+            self.transmit_pipeline =   Pipeline(source=self.transmit_mixer, codec=self.transmit_codec, sink=self.active_call.packetizer)
 
             self.transmit_mixer.mute(self.__transmit_muted)
             self.transmit_mixer.start()
@@ -609,11 +610,13 @@ class Telephone(SignallingReceiver):
 
                     self.__prepare_dialling_pipelines()
                     self.active_call.packetizer = Packetizer(self.active_call, failure_callback=self.__packetizer_failure)
-                    self.transmit_mixer = Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
-                    self.audio_input = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(), sink=self.transmit_mixer, filters=self.active_call.filters)
-                    self.transmit_pipeline = Pipeline(source=self.transmit_mixer,
-                                                      codec=self.transmit_codec,
-                                                      sink=self.active_call.packetizer)
+
+                    self.transmit_mixer    =      Mixer(target_frame_ms=self.target_frame_time_ms, gain=self.transmit_gain)
+
+                    self.audio_input       = LineSource(preferred_device=self.microphone_device, target_frame_ms=self.target_frame_time_ms, codec=Raw(),
+                                                        sink=self.transmit_mixer, filters=self.active_call.filters, skip=0.075, ease_in=0.225)
+
+                    self.transmit_pipeline =   Pipeline(source=self.transmit_mixer, codec=self.transmit_codec, sink=self.active_call.packetizer)
                     
                     self.active_call.audio_source = LinkSource(link=self.active_call, signalling_receiver=self, sink=self.receive_mixer)
                     self.receive_mixer.set_source_max_frames(self.active_call.audio_source, 2)
