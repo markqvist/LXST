@@ -1,3 +1,5 @@
-soundcard
+rns
+lxmf
+cffi
 numpy
 pycodec2
