@@ -40,85 +40,73 @@ class Opus(Codec):
         self.output_bitrate = 0
         self.set_profile(profile)
 
+    @staticmethod
+    def profile_channels(profile):
+        if   profile == Opus.PROFILE_VOICE_LOW:      return 1
+        elif profile == Opus.PROFILE_VOICE_MEDIUM: return 1
+        elif profile == Opus.PROFILE_VOICE_HIGH:   return 1
+        elif profile == Opus.PROFILE_VOICE_MAX:    return 2
+        elif profile == Opus.PROFILE_AUDIO_MIN:    return 1
+        elif profile == Opus.PROFILE_AUDIO_LOW:    return 1
+        elif profile == Opus.PROFILE_AUDIO_MEDIUM: return 2
+        elif profile == Opus.PROFILE_AUDIO_HIGH:   return 2
+        elif profile == Opus.PROFILE_AUDIO_MAX:    return 2
+        else: raise CodecError(f"Unsupported profile")
+
+    @staticmethod
+    def profile_samplerate(profile):
+        if   profile == Opus.PROFILE_VOICE_LOW:    return 8000
+        elif profile == Opus.PROFILE_VOICE_MEDIUM: return 24000
+        elif profile == Opus.PROFILE_VOICE_HIGH:   return 48000
+        elif profile == Opus.PROFILE_VOICE_MAX:    return 48000
+        elif profile == Opus.PROFILE_AUDIO_MIN:    return 8000
+        elif profile == Opus.PROFILE_AUDIO_LOW:    return 12000
+        elif profile == Opus.PROFILE_AUDIO_MEDIUM: return 24000
+        elif profile == Opus.PROFILE_AUDIO_HIGH:   return 48000
+        elif profile == Opus.PROFILE_AUDIO_MAX:    return 48000
+        else: raise CodecError(f"Unsupported profile")
+
+    @staticmethod
+    def profile_application(profile):
+        if profile   == Opus.PROFILE_VOICE_LOW:    return "voip"
+        elif profile == Opus.PROFILE_VOICE_MEDIUM: return "voip"
+        elif profile == Opus.PROFILE_VOICE_HIGH:   return "voip"
+        elif profile == Opus.PROFILE_VOICE_MAX:    return "voip"
+        elif profile == Opus.PROFILE_AUDIO_MIN:    return "audio"
+        elif profile == Opus.PROFILE_AUDIO_LOW:    return "audio"
+        elif profile == Opus.PROFILE_AUDIO_MEDIUM: return "audio"
+        elif profile == Opus.PROFILE_AUDIO_HIGH:   return "audio"
+        elif profile == Opus.PROFILE_AUDIO_MAX:    return "audio"
+        else: raise CodecError(f"Unsupported profile")
+
+    @staticmethod
+    def profile_bitrate_ceiling(profile):
+        if   profile == Opus.PROFILE_VOICE_LOW:    return 6000
+        elif profile == Opus.PROFILE_VOICE_MEDIUM: return 8000
+        elif profile == Opus.PROFILE_VOICE_HIGH:   return 16000
+        elif profile == Opus.PROFILE_VOICE_MAX:    return 32000
+        elif profile == Opus.PROFILE_AUDIO_MIN:    return 8000
+        elif profile == Opus.PROFILE_AUDIO_LOW:    return 14000
+        elif profile == Opus.PROFILE_AUDIO_MEDIUM: return 28000
+        elif profile == Opus.PROFILE_AUDIO_HIGH:   return 56000
+        elif profile == Opus.PROFILE_AUDIO_MAX:    return 128000
+        else: raise CodecError(f"Unsupported profile")
+
+    @staticmethod
+    def max_bytes_per_frame(bitrate_ceiling, frame_duration_ms):
+        return math.ceil((bitrate_ceiling/8)*(frame_duration_ms/1000))
+
     def set_profile(self, profile):
-        if profile == self.PROFILE_VOICE_LOW:
-            self.profile = profile
-            self.channels = 1
-            self.input_channels = self.channels
-            self.output_samplerate = 8000
-            self.opus_encoder.set_application("voip")
-        elif profile == self.PROFILE_VOICE_MEDIUM:
-            self.profile = profile
-            self.channels = 1
-            self.input_channels = self.channels
-            self.output_samplerate = 24000
-            self.opus_encoder.set_application("voip")
-        elif profile == self.PROFILE_VOICE_HIGH:
-            self.profile = profile
-            self.channels = 1
-            self.input_channels = self.channels
-            self.output_samplerate = 48000
-            self.opus_encoder.set_application("voip")
-        elif profile == self.PROFILE_VOICE_MAX:
-            self.profile = profile
-            self.channels = 2
-            self.input_channels = self.channels
-            self.output_samplerate = 48000
-            self.opus_encoder.set_application("voip")
-        elif profile == self.PROFILE_AUDIO_MIN:
-            self.profile = profile
-            self.channels = 1
-            self.input_channels = self.channels
-            self.output_samplerate = 8000
-            self.opus_encoder.set_application("audio")
-        elif profile == self.PROFILE_AUDIO_LOW:
-            self.profile = profile
-            self.channels = 1
-            self.input_channels = self.channels
-            self.output_samplerate = 12000
-            self.opus_encoder.set_application("audio")
-        elif profile == self.PROFILE_AUDIO_MEDIUM:
-            self.profile = profile
-            self.channels = 2
-            self.input_channels = self.channels
-            self.output_samplerate = 24000
-            self.opus_encoder.set_application("audio")
-        elif profile == self.PROFILE_AUDIO_HIGH:
-            self.profile = profile
-            self.channels = 2
-            self.input_channels = self.channels
-            self.output_samplerate = 48000
-            self.opus_encoder.set_application("audio")
-        elif profile == self.PROFILE_AUDIO_MAX:
-            self.profile = profile
-            self.channels = 2
-            self.input_channels = self.channels
-            self.output_samplerate = 48000
-            self.opus_encoder.set_application("audio")
-        else:
-            raise CodecError(f"Unsupported profile configured for {self}")
+        self.channels = self.profile_channels(profile)
+        self.input_channels = self.channels
+        self.output_samplerate = self.profile_samplerate(profile)
+        self.opus_encoder.set_application(self.profile_application(profile))
+        self.profile = profile
 
     def update_bitrate(self, frame_duration_ms):
-        if self.profile == self.PROFILE_VOICE_LOW:
-            self.bitrate_ceiling = 6000
-        elif self.profile == self.PROFILE_VOICE_MEDIUM:
-            self.bitrate_ceiling = 8000
-        elif self.profile == self.PROFILE_VOICE_HIGH:
-            self.bitrate_ceiling = 16000
-        elif self.profile == self.PROFILE_VOICE_MAX:
-            self.bitrate_ceiling = 32000
-        elif self.profile == self.PROFILE_AUDIO_MIN:
-            self.bitrate_ceiling = 8000
-        elif self.profile == self.PROFILE_AUDIO_LOW:
-            self.bitrate_ceiling = 14000
-        elif self.profile == self.PROFILE_AUDIO_MEDIUM:
-            self.bitrate_ceiling = 28000
-        elif self.profile == self.PROFILE_AUDIO_HIGH:
-            self.bitrate_ceiling = 56000
-        elif self.profile == self.PROFILE_AUDIO_MAX:
-            self.bitrate_ceiling = 128000
+        self.bitrate_ceiling = self.profile_bitrate_ceiling(self.profile)
+        max_bytes_per_frame = self.max_bytes_per_frame(self.bitrate_ceiling, frame_duration_ms)
 
-        max_bytes_per_frame = math.ceil((self.bitrate_ceiling/8)*(frame_duration_ms/1000))
         configured_bitrate = (max_bytes_per_frame*8)/(frame_duration_ms/1000)
         self.opus_encoder.set_max_bytes_per_frame(max_bytes_per_frame)
 

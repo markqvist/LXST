@@ -160,7 +160,10 @@ class LineSource(LocalSource):
     MAX_FRAMES       = 128
     DEFAULT_FRAME_MS = 80
 
-    def __init__(self, preferred_device=None, target_frame_ms=DEFAULT_FRAME_MS, codec=None, sink=None, filters=None):
+    @staticmethod
+    def linear_gain(gain_db): return 10**(gain_db/10)
+
+    def __init__(self, preferred_device=None, target_frame_ms=DEFAULT_FRAME_MS, codec=None, sink=None, filters=None, gain=0.0, ease_in=0.0, skip=0.0):
         self.preferred_device = preferred_device
         self.frame_deque      = deque(maxlen=self.MAX_FRAMES)
         self.target_frame_ms  = target_frame_ms
@@ -174,10 +177,17 @@ class LineSource(LocalSource):
         self.codec            = codec
         self.sink             = sink
         self.filters          = None
+        self.ease_in          = ease_in
+        self.gain             = gain
+        self.__skip           = skip
+        self.__gain           = self.linear_gain(self.gain)
+        self.__target_gain    = self.__gain
 
         if filters != None:
             if type(filters) == list: self.filters = filters
             else:                     self.filters = [filters]
+
+        if self.ease_in != 0.0: self.__gain = 0.0
 
     @property
     def codec(self): return self._codec
@@ -229,18 +239,34 @@ class LineSource(LocalSource):
             else: backend_samples_per_frame = None
 
             with self.backend.get_recorder(samples_per_frame=backend_samples_per_frame) as recorder:
+                started = time.time()
+                ease_in_completed = True if self.ease_in <= 0.0 else False
+                skip_completed = True if self.__skip <= 0.0 else False
                 while self.should_run:
                     frame_samples = recorder.record(numframes=self.samples_per_frame)
-                    if self.filters != None:
-                        for f in self.filters: frame_samples = f.handle_frame(frame_samples, self.samplerate)
-                    if self.codec:
-                        frame = self.codec.encode(frame_samples)
-                        if self.sink and self.sink.can_receive(from_source=self):
-                            self.sink.handle_frame(frame, self)
+                    if not skip_completed:
+                        if time.time()-started > self.__skip:
+                            skip_completed = True
+                            started = time.time()
+                    else:
+                        if self.filters != None:
+                            for f in self.filters: frame_samples = f.handle_frame(frame_samples, self.samplerate)
+                        if self.__gain != 1.0: frame_samples *= self.__gain
+                        if self.codec:
+                            frame = self.codec.encode(frame_samples)
+                            if self.sink and self.sink.can_receive(from_source=self):
+                                self.sink.handle_frame(frame, self)
+                        if not ease_in_completed:
+                            d = time.time()-started
+                            self.__gain = (d/self.ease_in)*self.__target_gain
+                            if self.__gain >= self.__target_gain:
+                                self.__gain = self.__target_gain
+                                ease_in_completed = True
+
 
 class OpusFileSource(LocalSource):
     MAX_FRAMES       = 128
-    DEFAULT_FRAME_MS = 70
+    DEFAULT_FRAME_MS = 100
     TYPE_MAP_FACTOR  = np.iinfo("int16").max
 
     def __init__(self, file_path, target_frame_ms=DEFAULT_FRAME_MS, loop=False, codec=None, sink=None, timed=False):
@@ -332,5 +358,3 @@ class OpusFileSource(LocalSource):
                                 self.sink.handle_frame(frame, self)
                 else:
                     time.sleep(self.frame_time*0.1)
-
-class PacketSource(RemoteSource): pass

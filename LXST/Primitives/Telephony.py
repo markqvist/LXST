@@ -604,7 +604,7 @@ class Telephone(SignallingReceiver):
                     RNS.log(f"Opening audio pipelines for call with {RNS.prettyhexrep(identity.hash)}", RNS.LOG_DEBUG)
                     if self.active_call.is_incoming: self.signal(Signalling.STATUS_CONNECTING, self.active_call)
 
-                    if self.use_agc: self.active_call.filters = [BandPass(250, 8500), AGC()]
+                    if self.use_agc: self.active_call.filters = [BandPass(250, 8500), AGC(target_level=-15.0)]
                     else:            self.active_call.filters = [BandPass(250, 8500)]
 
                     self.__prepare_dialling_pipelines()

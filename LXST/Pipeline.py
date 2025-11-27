@@ -18,12 +18,10 @@ class Pipeline():
         self.source.sink     = sink
         self.codec           = codec
 
-        if isinstance(sink, Loopback):
-            sink.samplerate = source.samplerate
-        if isinstance(source, Loopback):
-            source._sink = sink
-        if isinstance(sink, Packetizer):
-            sink.source = source
+        if isinstance(sink, Loopback):     sink.samplerate = source.samplerate
+        if isinstance(source, Loopback):   source._sink = sink
+        if isinstance(sink, Packetizer):   sink.source = source
+        if isinstance(sink, OpusFileSink): sink.source = source
 
     @property
     def codec(self):
