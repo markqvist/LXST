@@ -1,8 +1,19 @@
 # Lightweight Extensible Signal Transport
 
-*This repository is [a public mirror](./MIRROR.md). All development is happening elsewhere.*
+> [!WARNING]
+> Several hastily launched, incorrect, and in most cases entirely LLM-generated fakes of LXST and associated tools and applications are currently being circulated and marketed. Most of these "projects" violate the license that LXST was published under, but claim independent ownership and license grants. Such claims or grants are **not** legally valid, and **not** recognized by the LXST author and copyright holder.
+>
+> Any claimed assertion of copyright or grant of license that such projects are making are [void grants](https://reticulum.network/manual/brandolinis.html#void-grants-legal-foundations-of-machine-generated-code).
+>
+> Both the violators themselves, and **all** downstream projects using the infringing derivatives, are **directly** and **personally** liable for the legal consequences.
+>
+> For more detailed information, see the relevant sections of the [Brandolini's Reference](https://reticulum.network/manual/brandolinis.html) chapter of the Reticulum Manual. For software and projects recognized by the Reticulum community, see the [Programs Using Reticulum](https://reticulum.network/manual/software.html) chapter.
+>
+> Do **not** use these "projects", they are a hazard to the entire ecosystem we have been carefully building over the last ten years.
 
-LXST is a simple and flexible real-time streaming format and delivery protocol that allows a wide variety of implementations, while using as little bandwidth as possible. It is built on top of [Reticulum](https://reticulum.network) and offers zero-conf stream routing, end-to-end encryption and Forward Secrecy, and can be transported over any kind of medium that Reticulum supports. For a user-facing client using LXST for real-time voice communication, see [Sideband](https://github.com/markqvist/Sideband).
+*Due to the blatant copyright infringement and LLM-laundering, the source code in this repository is no longer updated. All development is happening over Reticulum, where the latest source is available. Packages and updates continue to ship on PyPI and over `rngit`.*
+
+LXST is a simple and flexible real-time streaming format and delivery protocol that allows a wide variety of implementations, while using as little bandwidth as possible. It is built on top of [Reticulum](https://reticulum.network) and offers zero-conf stream routing, end-to-end encryption and Forward Secrecy, and can be transported over any kind of medium that Reticulum supports.
 
 - Cross-platform, works on Linux, Android, Windows and Mac
 - Provides a variety of ready-to-use primitives, for easily creating applications such as:
@@ -33,15 +44,24 @@ LXST is a simple and flexible real-time streaming format and delivery protocol t
 - Uses a fully staged signal pipelining, allowing arbitrary stream routing
 - Provides built-in signal mixing support for any number of channels
 
+User-facing clients built on LXST include:
+
+- [Sideband](https://unsigned.io/sideband)
+- [MeshChatX](https://meshchatx.com/)
+- [Partyline](https://github.com/RFnexus/partyline)
+- [Columba](https://github.com/torlando-tech/columba)
+- [rnphone](https://reticulum.network/manual/software.html#reticulum-network-telephone)
+- [LXST Phone](https://github.com/kc1awv/lxst_phone)
+
 ## Transport Encryption
 
 LXST uses encryption provided by [Reticulum](https://reticulum.network), and thus provides end-to-end encryption, guaranteed data integrity and authenticity, as well as forward secrecy by default.
 
 ## Project Status & License
 
-This software is in a very early alpha state, and will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at [Sideband](https://github.com/markqvist/Sideband) or the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
+This software and its interfaces will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at [Sideband](https://github.com/markqvist/Sideband) or the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
 
-While under early development, and unless otherwise noted, the project is kept under a `CC BY-NC-ND 4.0` license.
+The LXST project is available under a `CC BY-NC-ND 4.0` license. You can deploy LXST freely for non-commercial, personal and humanitarian purposes. For commercial (including institutionalised educational) licensing, contact me.
 
 ## Installation
 
@@ -62,23 +82,3 @@ pip install smbus2 --break-system-packages # Install smbus module if not already
 sudo raspi-config # Enable the I2C bus under "Interface Options"
 sudo apt install python3-rpi.gpio # Install gpio module system-wide
 ```
-
-## Support LXST Development
-You can help support the continued development of open, free and private communications systems by donating via one of the following channels:
-
-- Monero:
-  ```
-  84FpY1QbxHcgdseePYNmhTHcrgMX4nFfBYtz2GKYToqHVVhJp8Eaw1Z1EedRnKD19b3B8NiLCGVxzKV17UMmmeEsCrPyA5w
-  ```
-- Bitcoin
-  ```
-  bc1pgqgu8h8xvj4jtafslq396v7ju7hkgymyrzyqft4llfslz5vp99psqfk3a6
-  ```
-- Ethereum
-  ```
-  0x91C421DdfB8a30a49A71d63447ddb54cEBe3465E
-  ```
-- Liberapay: https://liberapay.com/Reticulum/
-
-- Ko-Fi: https://ko-fi.com/markqvist
-
