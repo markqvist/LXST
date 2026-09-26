@@ -13,6 +13,8 @@
 
 *Due to the blatant copyright infringement and LLM-laundering, the source code in this repository is no longer updated. All development is happening over Reticulum, where the latest source is available. Packages and updates continue to ship on PyPI and over `rngit`.*
 
+---
+
 LXST is a simple and flexible real-time streaming format and delivery protocol that allows a wide variety of implementations, while using as little bandwidth as possible. It is built on top of [Reticulum](https://reticulum.network) and offers zero-conf stream routing, end-to-end encryption and Forward Secrecy, and can be transported over any kind of medium that Reticulum supports.
 
 - Cross-platform, works on Linux, Android, Windows and Mac
