@@ -63,7 +63,9 @@ LXST uses encryption provided by [Reticulum](https://reticulum.network), and thu
 
 This software and its interfaces will change rapidly with ongoing development. Consider no APIs stable. Consider everything explosive. Not all features are implemented. Nothing is documented. For a fully functional LXST program, take a look at [Sideband](https://github.com/markqvist/Sideband) or the included `rnphone` program, which provides telephony service over Reticulum. Everything else will currently be a voyage of your own making.
 
-The LXST project is available under a `CC BY-NC-ND 4.0` license. You can deploy LXST freely for non-commercial, personal and humanitarian purposes. For commercial (including institutionalised educational) licensing, contact me.
+The LXST project is available under a `CC BY-NC-ND 4.0` license. You can use and deploy LXST freely for non-commercial, personal and humanitarian purposes, including in your own programs. At this point, no derivatives are allowed without an explicit license.
+
+For commercial (including institutionalised educational) licensing, contact me.
 
 LXST uses third-party codecs, and where included in source and binary distributions, these are distributed under their respective licenses:
 
