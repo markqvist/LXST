@@ -1,3 +1,5 @@
+// Copyright 2024-2026, Mark Qvist
+
 #include <math.h>
 
 void highpass_filter(float* input, float* output, int samples, int channels, float alpha, float* filter_states, float* last_inputs) {
@@ -62,7 +64,7 @@ void agc_process(float* input, float* output, int samples, int channels, float t
     float peak = 0.0f;
     for (int i = 0; i < samples; i++) { int idx = i * channels + ch; float abs_val = fabsf(output[idx]);
                                         if (abs_val > peak) { peak = abs_val; } }
-    
+
     if (peak > peak_limit) { float scale = peak_limit / peak;
                              for (int i = 0; i < samples; i++) { int idx = i * channels + ch; output[idx] *= scale; } }
   }

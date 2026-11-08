@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Copyright 2024-2026, Mark Qvist
+
 import RNS
 import os
 import sys

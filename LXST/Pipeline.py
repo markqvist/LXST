@@ -1,3 +1,7 @@
+# Copyright 2024-2026, Mark Qvist
+
+import threading
+
 from .Sources import *
 from .Sinks   import *
 from .Codecs  import *
@@ -8,6 +12,8 @@ class PipelineError(Exception):
     pass
 
 class Pipeline():
+    release_lock = threading.Lock()
+
     def __init__(self, source, codec, sink, processor = None):
         if not issubclass(type(source), Source): raise PipelineError("Audio pipeline initialised with invalid source")
         if not issubclass(type(sink), Sink)    : raise PipelineError("Audio pipeline initialised with invalid sink")
@@ -20,15 +26,22 @@ class Pipeline():
 
         if isinstance(sink, Loopback):     sink.samplerate = source.samplerate
         if isinstance(source, Loopback):   source._sink = sink
+        if isinstance(source, Mixer):      source._sink = sink
         if isinstance(sink, Packetizer):   sink.source = source
         if isinstance(sink, OpusFileSink): sink.source = source
 
+    def release(self):
+        if self.release_lock.locked(): return
+        with self.release_lock:
+            if not hasattr(self, "released") or not self.released:
+                self.released = True
+                self.source   = None
+                self._codec   = None
+
     @property
     def codec(self):
-        if self.source:
-            return self.source.codec
-        else:
-            return None
+        if self.source: return self.source.codec
+        else:           return None
 
     @codec.setter
     def codec(self, codec):
@@ -40,19 +53,15 @@ class Pipeline():
 
     @property
     def sink(self):
-        if self.source:
-            return self.source.sink
-        else:
-            return None
+        if self.source: return self.source.sink
+        else:           return None
 
     @property
     def running(self):
         return self.source.should_run
 
     def start(self):
-        if not self.running:
-            self.source.start()
+        if not self.running: self.source.start()
 
     def stop(self):
-        if self.running:
-            self.source.stop()
+        if self.running: self.source.stop()

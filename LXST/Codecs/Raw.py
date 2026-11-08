@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import RNS
 import numpy as np
 from .Codec import Codec
@@ -56,3 +58,5 @@ class Raw(Codec):
         if not self.channels: self.channels = frame_channels
 
         return frame_samples
+
+    def __str__(self): return f"<LXST/Raw @ {RNS.prettyspeed(self.channels*self.bitdepth*48000)}>"

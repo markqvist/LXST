@@ -2,17 +2,22 @@ import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import os
+import sys
 import platform
 
 if os.path.isfile("./skip_extensions"): BUILD_EXTENSIONS = False
 else:                                   BUILD_EXTENSIONS = True
 if os.name == "nt":                     BUILD_EXTENSIONS = False
 
-if BUILD_EXTENSIONS: print(f"Building LXST with native extensions...")
-else: print(f"Building LXST without native extensions...")
-
 with open("README.md", "r") as fh: long_description = fh.read()
 exec(open("LXST/_version.py", "r").read())
+
+if "--getversion" in sys.argv:
+    print(__version__, end="")
+    exit(0)
+
+if BUILD_EXTENSIONS: print(f"Building LXST with native extensions...")
+else: print(f"Building LXST without native extensions...")
 
 c_sources = ["LXST/Filters.c"]
 
@@ -65,8 +70,8 @@ setuptools.setup(
             'rnphone=LXST.Utilities.rnphone:main',
         ]
     },
-    install_requires=["rns>=1.0.4",
-                      "lxmf>=0.9.3",
+    install_requires=["rns>=1.6.0",
+                      "lxmf>=1.3.0",
                       "numpy>=2.3.4",
                       "pycodec2>=4.1.0",
                       "audioop-lts>=0.2.1;python_version>='3.13'",

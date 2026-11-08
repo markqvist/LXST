@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import RNS
 import LXST
 import time
@@ -17,6 +19,7 @@ class Mixer(LocalSource, LocalSink):
 
     def __init__(self, target_frame_ms=40, samplerate=None, codec=None, sink=None, gain=0.0):
         self.incoming_frames  = {}
+        self.reference_outs   = []
         self.target_frame_ms  = target_frame_ms
         self.frame_time       = self.target_frame_ms/1000
         self.should_run       = False
@@ -99,6 +102,7 @@ class Mixer(LocalSource, LocalSink):
         else:                  return 10**(self.gain/10)
 
     def _mixer_job(self):
+        if self.mixer_lock.locked(): return
         with self.mixer_lock:
             while self.should_run:
                 if self.sink and self.sink.can_receive():
@@ -117,13 +121,22 @@ class Mixer(LocalSource, LocalSink):
                             if mixed_frame.max() >= 1.0 or mixed_frame.min() <= -1.0:
                                 RNS.log(f"Signal clipped on {self}", RNS.LOG_WARNING)
 
-                        if self.codec: self.sink.handle_frame(self.codec.encode(mixed_frame), self)
-                        else:          self.sink.handle_frame(mixed_frame, self)
-                    else:
-                        time.sleep(self.frame_time*0.1)
+                        try:
+                            if self.codec: self.sink.handle_frame(self.codec.encode(mixed_frame), self)
+                            else:          self.sink.handle_frame(mixed_frame, self)
+                        
+                        except Exception as e: RNS.log(f"Error while mixing frame on {self}: {e}", RNS.LOG_ERROR)
 
-                else:
-                    time.sleep(self.frame_time*0.1)
+                        try:
+                            for ref in self.reference_outs: ref.handle_reference(mixed_frame, self.samplerate)
+
+                        except Exception as e: RNS.log(f"Error while handling reference output on {self}: {e}", RNS.LOG_ERROR)
+                        
+                    else: time.sleep(self.frame_time*0.1)
+
+                else: time.sleep(self.frame_time*0.1)
+
+            RNS.log(f"{self} stopped", RNS.LOG_DEBUG)
 
     @property
     def codec(self):

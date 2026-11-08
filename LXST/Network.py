@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import RNS
 import time
 import threading
@@ -23,7 +25,8 @@ class SignallingReceiver():
         if self.proxy: self.proxy.signalling_received(signals, source)
 
     def signal(self, signal, destination, immediate=True):
-        signalling_data = {FIELD_SIGNALLING:[signal]}
+        if type(signal) != list: signalling_data = {FIELD_SIGNALLING: [signal]}
+        else:                    signalling_data = {FIELD_SIGNALLING: signal}
 
         if immediate:
             signalling_packet = RNS.Packet(destination, mp.packb(signalling_data), create_receipt=False)
@@ -52,11 +55,12 @@ class Packetizer(RemoteSink):
         self.should_run = False
         self.source = None
         self.transmit_failure = False
+        self.squelched = False
         self.__failure_calback = failure_callback
 
     def handle_frame(self, frame, source=None):
-        if type(self.destination) == RNS.Link and not self.destination.status == RNS.Link.ACTIVE:
-            return
+        if type(self.destination) == RNS.Link and not self.destination.status == RNS.Link.ACTIVE: return
+        if self.squelched: return
 
         # TODO: Add inband signalling scheduler
         frame = codec_header_byte(type(self.source.codec))+frame
@@ -92,8 +96,9 @@ class Packetizer(RemoteSink):
             RNS.log(f"{self} starting", RNS.LOG_DEBUG)
             self.should_run = True
 
-    def stop(self):
-        self.should_run = False
+    def stop(self):      self.should_run = False
+    def squelch(self):   self.squelched  = True
+    def unsquelch(self): self.squelched  = False
 
 class LinkSource(RemoteSource, SignallingReceiver):
     def __init__(self, link, signalling_receiver, sink=None):

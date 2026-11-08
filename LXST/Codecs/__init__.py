@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 from .Codec import CodecError as CodecError
 from .Codec import Codec as Codec
 from .Codec import Null as Null

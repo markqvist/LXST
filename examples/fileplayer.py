@@ -15,6 +15,7 @@ if loop:
 
 else:
     player = FilePlayer("./docs/speech_stereo.opus")
+    player.release_on_finish = True
     player.start()
 
     while player.running: time.sleep(0.1)

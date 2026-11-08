@@ -1,1 +1,0 @@
-void PyInit_filterlib(void) { }

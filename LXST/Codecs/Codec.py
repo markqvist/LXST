@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import numpy as np
 from .libs.pydub import AudioSegment
 
@@ -11,6 +13,8 @@ class Codec():
     source               = None
     sink                 = None
 
+    def __str__(self): return f"<LXST/Codec>"
+
 class CodecError(Exception):
     pass
 
@@ -23,6 +27,8 @@ class Null(Codec):
 
     def decode(self, frame):
         return frame
+
+    def __str__(self): return f"<LXST/NullCodec>"
 
 def resample_bytes(sample_bytes, bitdepth, channels, input_rate, output_rate, normalize=False):
     sample_width = bitdepth//8

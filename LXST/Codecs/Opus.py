@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import io
 import RNS
 import time
@@ -21,6 +23,19 @@ class Opus(Codec):
     PROFILE_AUDIO_MEDIUM = 0x06
     PROFILE_AUDIO_HIGH   = 0x07
     PROFILE_AUDIO_MAX    = 0x08
+
+    @staticmethod
+    def profile_name(profile):
+        if   profile == Opus.PROFILE_VOICE_LOW:    return "Voice, Low"
+        elif profile == Opus.PROFILE_VOICE_MEDIUM: return "Voice, Medium"
+        elif profile == Opus.PROFILE_VOICE_HIGH:   return "Voice, High"
+        elif profile == Opus.PROFILE_VOICE_MAX:    return "Voice, Max"
+        elif profile == Opus.PROFILE_AUDIO_MIN:    return "Audio, Min"
+        elif profile == Opus.PROFILE_AUDIO_LOW:    return "Audio, Low"
+        elif profile == Opus.PROFILE_AUDIO_MEDIUM: return "Audio, Medium"
+        elif profile == Opus.PROFILE_AUDIO_HIGH:   return "Audio, High"
+        elif profile == Opus.PROFILE_AUDIO_MAX:    return "Audio, Max"
+        else:                                      return "Default"
 
     def __init__(self, profile=PROFILE_VOICE_LOW):
         self.frame_quanta_ms = self.FRAME_QUANTA_MS
@@ -165,3 +180,5 @@ class Opus(Codec):
         frame_samples = decoded_samples.reshape(len(decoded_samples)//self.channels, self.channels)
 
         return frame_samples
+
+    def __str__(self): return f"<LXST/Opus @ {self.profile_name(self.profile)}>"

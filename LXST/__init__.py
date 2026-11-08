@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 APP_NAME = "lxst"
 
 from .Pipeline import Pipeline

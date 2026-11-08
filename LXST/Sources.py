@@ -1,3 +1,5 @@
+# Copyright 2024-2026, Mark Qvist
+
 import os
 import RNS
 import math
@@ -118,7 +120,21 @@ def get_backend():
 
 Backend = get_backend()
 
-class Source(): pass
+class Source():
+    release_lock = threading.Lock()
+    def release(self):
+        if self.release_lock.locked(): return
+        with self.release_lock:
+            if not hasattr(self, "released") or not self.released:
+                self.released    = True
+                self.should_run  = False
+                self.frame_deque = None
+                self.codec       = None
+                self._sink       = None
+                self._source     = None
+                self._filters    = None
+                self.backend     = None
+
 class LocalSource(Source): pass
 class RemoteSource(Source): pass
 
@@ -159,6 +175,7 @@ class Loopback(LocalSource, LocalSink):
 class LineSource(LocalSource):
     MAX_FRAMES       = 128
     DEFAULT_FRAME_MS = 80
+    SIGNAL_FAIL_REINIT_THRESHOLD = 1.5
 
     @staticmethod
     def linear_gain(gain_db): return 10**(gain_db/10)
@@ -182,6 +199,11 @@ class LineSource(LocalSource):
         self.__skip           = skip
         self.__gain           = self.linear_gain(self.gain)
         self.__target_gain    = self.__gain
+
+        self.__check_signal   = RNS.vendor.platformutils.is_android()
+        self.__signal_failed  = None
+        self.__signal_ok      = False
+        self.__must_reinit    = False
 
         if filters != None:
             if type(filters) == list: self.filters = filters
@@ -243,19 +265,46 @@ class LineSource(LocalSource):
                 ease_in_completed = True if self.ease_in <= 0.0 else False
                 skip_completed = True if self.__skip <= 0.0 else False
                 while self.should_run:
+                    # st = time.perf_counter() # TODO: Remove debug
                     frame_samples = recorder.record(numframes=self.samples_per_frame)
+                    # rt = time.perf_counter()-st # TODO: Remove debug
+
+                    if self.__check_signal and not self.__signal_ok:
+                        if np.all(frame_samples == 0):
+                            if not self.__signal_failed: self.__signal_failed = time.time()
+                        else:
+                            self.__signal_ok = True
+                            RNS.log(f"Input signal detected on {self}", RNS.LOG_DEBUG)
+
+                        if not self.__signal_ok and self.__signal_failed:
+                            fail_duration = time.time()-self.__signal_failed
+                            RNS.log(f"No signal for {RNS.prettyshorttime(fail_duration)} on {self}", RNS.LOG_DEBUG)
+                            if fail_duration > self.SIGNAL_FAIL_REINIT_THRESHOLD:
+                                RNS.log(f"Scheduling re-init on {self}", RNS.LOG_DEBUG)
+                                self.__must_reinit = True
+                                self.stop()
+
                     if not skip_completed:
                         if time.time()-started > self.__skip:
                             skip_completed = True
                             started = time.time()
                     else:
+                        # ft = 0 # TODO: Remove debug
                         if self.filters != None:
+                            # st = time.perf_counter() # TODO: Remove debug
                             for f in self.filters: frame_samples = f.handle_frame(frame_samples, self.samplerate)
+                            # ft = time.perf_counter()-st # TODO: Remove debug
                         if self.__gain != 1.0: frame_samples *= self.__gain
                         if self.codec:
-                            frame = self.codec.encode(frame_samples)
                             if self.sink and self.sink.can_receive(from_source=self):
-                                self.sink.handle_frame(frame, self)
+                                try:
+                                    # st = time.perf_counter() # TODO: Remove debug
+                                    frame = self.codec.encode(frame_samples)
+                                    self.sink.handle_frame(frame, self)
+                                    # et = time.perf_counter()-st # TODO: Remove debug
+                                except Exception as e: RNS.log(f"Encode error on {self}: {e}", RNS.LOG_DEBUG) if RNS.sl(RNS.LOG_DEBUG) else None
+                                # RNS.log(f"REC/FLT/SNK: {RNS.prettyshorttime(rt)} / {RNS.prettyshorttime(ft)}, / {RNS.prettyshorttime(et)}", RNS.LOG_DEBUG) # TODO: Remove debug
+
                         if not ease_in_completed:
                             d = time.time()-started
                             self.__gain = (d/self.ease_in)*self.__target_gain
@@ -263,13 +312,22 @@ class LineSource(LocalSource):
                                 self.__gain = self.__target_gain
                                 ease_in_completed = True
 
+        if self.__must_reinit:
+            self.__must_reinit   = False
+            self.__signal_ok     = False
+            self.__signal_failed = None
+            self.start()
+
 
 class OpusFileSource(LocalSource):
     MAX_FRAMES       = 128
     DEFAULT_FRAME_MS = 100
     TYPE_MAP_FACTOR  = np.iinfo("int16").max
 
-    def __init__(self, file_path, target_frame_ms=DEFAULT_FRAME_MS, loop=False, codec=None, sink=None, timed=False):
+    @staticmethod
+    def linear_gain(gain_db): return 10**(gain_db/10)
+
+    def __init__(self, file_path, target_frame_ms=DEFAULT_FRAME_MS, loop=False, codec=None, sink=None, timed=False, gain=0.0):
         self.target_frame_ms = target_frame_ms
         self.loop            = loop
         self.timed           = timed
@@ -278,6 +336,8 @@ class OpusFileSource(LocalSource):
         self.ingest_thread   = None
         self.next_frame      = None
         self._codec          = None
+        self._gain_db        = gain
+        self.__gain          = self.linear_gain(self._gain_db)
 
         if file_path == None: raise TypeError(f"{self} initialised with invalid file path: {file_path}")
         elif os.path.isfile(file_path):
@@ -295,6 +355,19 @@ class OpusFileSource(LocalSource):
 
         self.codec           = codec
         self.sink            = sink
+
+    @property
+    def running(self): return self.should_run
+
+    @property
+    def gain(self): return self._gain_db
+
+    @gain.setter
+    def gain(self, db):
+        try: db = float(db)
+        except: raise TypeError("Invalid gain type, must be decibel as a floating point number")
+        self._gain_db = db
+        self.__gain = self.linear_gain(self._gain_db)
 
     @property
     def codec(self): return self._codec
@@ -344,6 +417,7 @@ class OpusFileSource(LocalSource):
                     fi += 1
                     fs = (fi-1)*spf; fe = min(fi*spf, sc)
                     frame_samples = self.samples[fs:fe, :]
+                    if self.__gain != 1.0: frame_samples *= self.__gain
                     if len(frame_samples) < 1:
                         if self.loop:
                             RNS.log(f"{self} exhausted file samples, looping...", RNS.LOG_DEBUG)
@@ -353,8 +427,10 @@ class OpusFileSource(LocalSource):
                             self.should_run = False
                     else:
                         if self.codec:
-                            frame = self.codec.encode(frame_samples)
                             if self.sink and self.sink.can_receive(from_source=self):
-                                self.sink.handle_frame(frame, self)
+                                try:
+                                    frame = self.codec.encode(frame_samples)
+                                    self.sink.handle_frame(frame, self)
+                                except Exception as e: RNS.log(f"Encode error on {self}: {e}", RNS.LOG_DEBUG) if RNS.sl(RNS.LOG_DEBUG) else None
                 else:
                     time.sleep(self.frame_time*0.1)
